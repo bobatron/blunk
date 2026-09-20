@@ -19,7 +19,12 @@ const EYEBROW_OFF = 0.2;
 const WINK_DEBOUNCE_FRAMES = 3;
 
 export interface FaceSignalsEvents {
+  /** Both eyes closed together. */
   blink: () => void;
+  /** Either eye closing at all, blink or wink — the strict "no closed eyes"
+   * signal for games like the Staring Contest, where winking one eye at a
+   * time to dodge blink detection would otherwise be a way to cheat. */
+  eyeClosed: () => void;
   wink: (payload: { eye: "left" | "right" }) => void;
   mouthOpen: () => void;
   mouthClosed: () => void;
@@ -54,6 +59,7 @@ export class FaceSignalsDetector {
   private rafId: number | null = null;
   private listeners = new Map<EventName, Set<(...args: never[]) => void>>();
   private eyesClosed = false;
+  private anyEyeClosed = false;
   private mouthOpenState = false;
   private eyebrowRaisedState = false;
   private leftWinkFrames = 0;
@@ -133,6 +139,15 @@ export class FaceSignalsDetector {
       this.emit("blink");
     } else if (bothOpen && this.eyesClosed) {
       this.eyesClosed = false;
+    }
+
+    // Eye closed: either eye, blink or wink — no dodging via single-eye winks.
+    const eitherClosed = eyeBlinkLeft > BLINK_ON || eyeBlinkRight > BLINK_ON;
+    if (eitherClosed && !this.anyEyeClosed) {
+      this.anyEyeClosed = true;
+      this.emit("eyeClosed");
+    } else if (bothOpen && this.anyEyeClosed) {
+      this.anyEyeClosed = false;
     }
 
     // Wink: one eye closed, the other clearly open, held for a few frames.

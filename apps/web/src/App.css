@@ -25,6 +25,11 @@
   color: #d73a4a;
 }
 
+.hint {
+  font-size: 13px;
+  color: #888;
+}
+
 .staring-contest-hud {
   position: fixed;
   top: 12px;
@@ -49,8 +54,7 @@
   cursor: pointer;
 }
 
-.round-status,
-.winner-banner {
+.round-status {
   background: rgba(0, 0, 0, 0.7);
   color: white;
   padding: 6px 14px;
@@ -58,10 +62,72 @@
   text-align: center;
 }
 
-.winner-banner h2 {
-  margin: 0 0 8px;
+.lobby {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.8);
   color: white;
-  font-size: 22px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  text-align: center;
+  font-family: system-ui, sans-serif;
+  min-width: 220px;
+}
+
+.lobby h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  color: white;
+}
+
+.lobby h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ccc;
+}
+
+.last-winner {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: #ffd54f;
+}
+
+.lobby-players {
+  margin: 8px 0;
+}
+
+.lobby-players ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lobby button {
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #aa3bff;
+  color: white;
+  cursor: pointer;
+}
+
+.lobby button:disabled {
+  background: #666;
+  cursor: not-allowed;
+}
+
+.lobby .hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #ccc;
 }
 
 .scoreboard {

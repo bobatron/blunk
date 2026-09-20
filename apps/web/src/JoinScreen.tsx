@@ -6,6 +6,8 @@ export interface JoinDetails {
   roomName: string;
   participantName: string;
   token: string;
+  audioEnabled: boolean;
+  videoEnabled: boolean;
 }
 
 interface Props {
@@ -29,7 +31,13 @@ export function JoinScreen({ onJoined }: Props) {
         throw new Error(body.error ?? `Server returned ${res.status}`);
       }
       const { token } = await res.json();
-      onJoined({ roomName, participantName: choices.username, token });
+      onJoined({
+        roomName,
+        participantName: choices.username,
+        token,
+        audioEnabled: choices.audioEnabled,
+        videoEnabled: choices.videoEnabled,
+      });
     } catch (err) {
       setError((err as Error).message);
     }
@@ -39,6 +47,7 @@ export function JoinScreen({ onJoined }: Props) {
     <div className="join-screen">
       <h1>Blunk</h1>
       <p>Join a room, camera on, don't blink.</p>
+      <p className="hint">Playing with others in the same physical room? Turn your mic off below to avoid audio feedback.</p>
       <label className="room-input">
         Room code
         <input

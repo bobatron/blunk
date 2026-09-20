@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
-import { Scoreboard } from "./Scoreboard";
 
 function playBlunkSound() {
   try {
@@ -22,13 +21,12 @@ function playBlunkSound() {
 }
 
 /**
- * The Staring Contest HUD: start/replay controls, live round status, and
- * the "BLUNK!" reveal when someone's eliminated. Rendered as an overlay on
- * top of the LiveKit VideoConference.
+ * The in-round Staring Contest HUD: live status while a round is active,
+ * and the "BLUNK!" reveal when someone's eliminated. Pre/post-round UI
+ * (start button, winner, scoreboard) lives in Lobby instead.
  */
 export function StaringContest() {
-  const { playerId, players, roundActive, eliminations, winnerId, startRound, errorMessage } =
-    useGameServer();
+  const { playerId, players, roundActive, eliminations } = useGameServer();
   const [flash, setFlash] = useState<{ name: string; key: number } | null>(null);
 
   useEffect(() => {
@@ -43,28 +41,17 @@ export function StaringContest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eliminations]);
 
+  if (!roundActive && !flash) return null;
+
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
-  const winnerName = winnerId ? players.find((p) => p.id === winnerId)?.name : null;
-  const roundHasFinished = winnerId !== undefined;
 
   return (
     <div className="staring-contest-hud">
-      {!roundActive && !roundHasFinished && (
-        <button onClick={startRound}>Start Staring Contest ({players.length} players)</button>
-      )}
-      {errorMessage && <p className="error">{errorMessage}</p>}
       {roundActive && (
         <p className="round-status">
           {players.length - eliminations.length} still staring
           {isEliminated && " — you're out, spectate and cheer!"}
         </p>
-      )}
-      {roundHasFinished && !roundActive && (
-        <div className="winner-banner">
-          <h2>{winnerName ? `${winnerName} wins!` : "Round over"}</h2>
-          <Scoreboard />
-          <button onClick={startRound}>Play again</button>
-        </div>
       )}
       {flash && (
         <div key={flash.key} className="blunk-flash">

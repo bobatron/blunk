@@ -7,7 +7,10 @@ import { useGameServer } from "./game-server/useGameServer";
  * Runs blink detection against the local participant's own camera feed
  * (piped from LiveKit's local video track into a hidden <video>, since the
  * prebuilt VideoConference UI doesn't expose the raw element) and reports
- * blinks to the game-server while a round is active. Renders nothing.
+ * eye closures to the game-server while a round is active. Uses the
+ * `eyeClosed` signal (either eye, not just a synchronized two-eye blink) so
+ * winking one eye at a time can't be used to dodge detection. Renders
+ * nothing.
  */
 export function LocalFaceSignals() {
   const { cameraTrack } = useLocalParticipant();
@@ -26,12 +29,12 @@ export function LocalFaceSignals() {
 
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
 
-  const handleBlink = useCallback(() => {
+  const handleEyeClosed = useCallback(() => {
     if (roundActive && !isEliminated) sendBlunk();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundActive, isEliminated]);
 
-  useFaceSignals(videoRef, { blink: handleBlink });
+  useFaceSignals(videoRef, { eyeClosed: handleEyeClosed });
 
   return <video ref={videoRef} muted playsInline style={{ display: "none" }} />;
 }

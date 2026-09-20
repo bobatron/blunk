@@ -60,6 +60,10 @@ Mini-games, roughly in priority order:
 - **Free-for-all**, not paired duels: everyone stares into their own camera
   at once; whoever the camera catches blinking first is out. Last player
   remaining wins the round.
+- Elimination triggers on **either eye closing**, not just a synchronized
+  two-eye blink — closing one eye at a time (winking) doesn't dodge
+  detection. Fixed 2026-09-20 after this was flagged as an actual cheat
+  vector in testing.
 - No artificial pacing mechanism — the round runs as long as it naturally
   takes; no timers or escalating difficulty.
 - The "BLUNK!" moment is a big, silly spectacle: freeze-frame + zoom on the
@@ -105,6 +109,13 @@ Mini-games, roughly in priority order:
    a fallback in case venue wifi is bad on the day.
 5. Zero-friction join: link → camera permission → in lobby, no install, no
    account.
+6. **Audio feedback when players are physically co-located** — directly
+   relevant, since that's exactly the meetup scenario (everyone in one
+   room). LiveKit's `PreJoin` already lets a player disable their mic
+   before joining; fixed 2026-09-20 to actually respect that choice
+   (previously hardcoded audio/video on regardless of what was picked).
+   Video should generally stay on (needed for face detection), but players
+   testing/playing side-by-side should turn mics off.
 
 ## Working agreements
 
