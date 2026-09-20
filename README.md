@@ -6,6 +6,11 @@ contest where the last player to blink ("blunk!") wins.
 
 See [PLANNING.md](./PLANNING.md) for architecture, roadmap, and how we work.
 
+## Live
+
+- Web app: https://blunk-web.vercel.app
+- Game server: https://blunk-game-server.fly.dev
+
 ## Structure
 
 - `apps/web` — React + Vite frontend. Video/audio via [LiveKit](https://livekit.io/).
@@ -36,7 +41,11 @@ test multi-participant video/audio.
 
 - **Web app**: connect the repo to [Vercel](https://vercel.com/) and set the
   project's Root Directory to `apps/web`. Add the two `VITE_*` env vars from
-  `apps/web/.env.example` in the Vercel project settings. Auto-deploys on
+  `apps/web/.env.example` in the Vercel project settings — pick **Config**
+  as the type, not **Secret** (Secret values are write-only and never reach
+  the browser bundle, but `VITE_`-prefixed vars are deliberately baked into
+  it by Vite, so Vercel blocks that combination; once saved as Secret it
+  can't be converted, only deleted and re-added as Config). Auto-deploys on
   push to `main`.
 - **Game server**: deployed to [Fly.io](https://fly.io/) via the root
   `fly.toml` (see the comments in that file for the one-time setup). Run all
