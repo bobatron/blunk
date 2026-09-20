@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
+import { Scoreboard } from "./Scoreboard";
 
 function playBlunkSound() {
   try {
@@ -61,6 +62,7 @@ export function StaringContest() {
       {roundHasFinished && !roundActive && (
         <div className="winner-banner">
           <h2>{winnerName ? `${winnerName} wins!` : "Round over"}</h2>
+          <Scoreboard />
           <button onClick={startRound}>Play again</button>
         </div>
       )}

@@ -64,6 +64,35 @@
   font-size: 22px;
 }
 
+.scoreboard {
+  margin: 8px 0;
+  min-width: 180px;
+}
+
+.scoreboard h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ccc;
+}
+
+.scoreboard ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.scoreboard li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 2px 4px;
+}
+
 .blunk-flash {
   position: fixed;
   inset: 0;
