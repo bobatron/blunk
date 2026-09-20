@@ -25,7 +25,14 @@ Target: playable live demo at a games developer meetup, 3 weeks from project sta
   the staring contest is decided by **server timestamp**, not client-reported
   order, so near-simultaneous blinks resolve fairly.
 - **State**: in-memory on the game server for v1. Rooms are ephemeral — no
-  database needed yet.
+  database needed yet. **This means the game-server must run as exactly one
+  instance** — Fly.io's `fly launch` creates 2 machines for high
+  availability by default, and since state isn't shared between them,
+  players can silently land on different machines and not see each other.
+  Pinned to `fly scale count 1 --app blunk-game-server` on 2026-09-20 after
+  hitting this live. If this needs to change later (e.g. redundancy for the
+  actual meetup), state needs to move to something shared (Redis) first —
+  don't just scale the machine count back up.
 
 ## Game format
 
