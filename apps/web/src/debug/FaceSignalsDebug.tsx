@@ -1,109 +1,59 @@
-import { useEffect, useRef, useState } from "react";
-import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFaceSignals } from "../face-signals/useFaceSignals";
 
-const TRACKED = [
-  "eyeBlinkLeft",
-  "eyeBlinkRight",
-  "jawOpen",
-  "browOuterUpLeft",
-  "browOuterUpRight",
+const BARS = [
+  { key: "eyeBlinkLeft", label: "eyeBlinkLeft" },
+  { key: "eyeBlinkRight", label: "eyeBlinkRight" },
+  { key: "jawOpen", label: "jawOpen" },
+  { key: "browOuterUp", label: "browOuterUp (avg)" },
 ] as const;
 
-const BLINK_ON_THRESHOLD = 0.5;
-const BLINK_OFF_THRESHOLD = 0.3;
+type ScoreKey = (typeof BARS)[number]["key"];
+type Scores = Record<ScoreKey, number>;
 
-type Scores = Record<(typeof TRACKED)[number], number>;
-
-const zeroScores: Scores = {
-  eyeBlinkLeft: 0,
-  eyeBlinkRight: 0,
-  jawOpen: 0,
-  browOuterUpLeft: 0,
-  browOuterUpRight: 0,
-};
+const zeroScores: Scores = { eyeBlinkLeft: 0, eyeBlinkRight: 0, jawOpen: 0, browOuterUp: 0 };
 
 /**
- * Spike for issue #7: is MediaPipe's blendshape output reliable enough to
- * skip hand-rolled EAR/MAR math? Blink a deliberate number of times and
- * check the counter matches, across a couple of devices/lighting setups.
+ * Dogfoods the shared face-signals module (issue #8) — also doubles as the
+ * manual test harness from issue #7's spike for checking detection quality
+ * on a new device/lighting setup.
  */
 export function FaceSignalsDebug() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraReady, setCameraReady] = useState(false);
   const [scores, setScores] = useState<Scores>(zeroScores);
-  const [blinkCount, setBlinkCount] = useState(0);
-  const [status, setStatus] = useState("Requesting camera...");
+  const [events, setEvents] = useState<string[]>([]);
+
+  const logEvent = useCallback((label: string) => {
+    setEvents((prev) => [`${new Date().toLocaleTimeString()}  ${label}`, ...prev].slice(0, 20));
+  }, []);
+
+  const { status, error } = useFaceSignals(videoRef, {
+    scores: setScores,
+    blink: useCallback(() => logEvent("blink"), [logEvent]),
+    wink: useCallback(({ eye }: { eye: "left" | "right" }) => logEvent(`wink (${eye})`), [logEvent]),
+    mouthOpen: useCallback(() => logEvent("mouthOpen"), [logEvent]),
+    mouthClosed: useCallback(() => logEvent("mouthClosed"), [logEvent]),
+    eyebrowRaise: useCallback(() => logEvent("eyebrowRaise"), [logEvent]),
+  });
 
   useEffect(() => {
     let cancelled = false;
-    let rafId: number;
-    let landmarker: FaceLandmarker | null = null;
     let stream: MediaStream | null = null;
-    let eyesClosed = false;
-
-    async function start() {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (cancelled) return;
-        const video = videoRef.current;
-        if (!video) return;
-        video.srcObject = stream;
-        await video.play();
-
-        setStatus("Loading face model...");
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm",
-        );
-        landmarker = await FaceLandmarker.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-            delegate: "GPU",
-          },
-          outputFaceBlendshapes: true,
-          runningMode: "VIDEO",
-          numFaces: 1,
-        });
-        if (cancelled) return;
-        setStatus("Running");
-
-        const loop = () => {
-          if (cancelled || !landmarker || !video) return;
-          const result = landmarker.detectForVideo(video, performance.now());
-          const categories = result.faceBlendshapes[0]?.categories;
-          if (categories) {
-            const next = { ...zeroScores };
-            for (const cat of categories) {
-              if ((TRACKED as readonly string[]).includes(cat.categoryName)) {
-                next[cat.categoryName as keyof Scores] = cat.score;
-              }
-            }
-            setScores(next);
-
-            const bothClosed =
-              next.eyeBlinkLeft > BLINK_ON_THRESHOLD && next.eyeBlinkRight > BLINK_ON_THRESHOLD;
-            const bothOpen =
-              next.eyeBlinkLeft < BLINK_OFF_THRESHOLD && next.eyeBlinkRight < BLINK_OFF_THRESHOLD;
-            if (bothClosed && !eyesClosed) {
-              eyesClosed = true;
-              setBlinkCount((c) => c + 1);
-            } else if (bothOpen && eyesClosed) {
-              eyesClosed = false;
-            }
-          }
-          rafId = requestAnimationFrame(loop);
-        };
-        loop();
-      } catch (err) {
-        if (!cancelled) setStatus(`Error: ${(err as Error).message}`);
+    navigator.mediaDevices.getUserMedia({ video: true }).then((s) => {
+      if (cancelled) {
+        s.getTracks().forEach((t) => t.stop());
+        return;
       }
-    }
-
-    start();
-
+      stream = s;
+      if (videoRef.current) {
+        videoRef.current.srcObject = s;
+        videoRef.current.play();
+      }
+      setCameraReady(true);
+    });
     return () => {
       cancelled = true;
-      cancelAnimationFrame(rafId);
-      landmarker?.close();
       stream?.getTracks().forEach((t) => t.stop());
     };
   }, []);
@@ -111,24 +61,21 @@ export function FaceSignalsDebug() {
   return (
     <div style={{ maxWidth: 480, margin: "24px auto", padding: "0 20px", fontFamily: "monospace" }}>
       <h1>Face signals debug</h1>
-      <p>{status}</p>
       <p>
-        Blink deliberately a few times and check this matches: <strong>{blinkCount}</strong>{" "}
-        {blinkCount !== 1 ? "blinks" : "blink"} detected
-        {" "}
-        <button onClick={() => setBlinkCount(0)}>reset</button>
+        camera: {cameraReady ? "ready" : "requesting..."} / detector: {status}
+        {error && ` (${error})`}
       </p>
       <video ref={videoRef} muted playsInline style={{ width: "100%", borderRadius: 8 }} />
       <table style={{ width: "100%", marginTop: 16 }}>
         <tbody>
-          {TRACKED.map((key) => (
+          {BARS.map(({ key, label }) => (
             <tr key={key}>
-              <td>{key}</td>
+              <td>{label}</td>
               <td style={{ width: "60%" }}>
                 <div style={{ background: "#eee", height: 16 }}>
                   <div
                     style={{
-                      background: scores[key] > BLINK_ON_THRESHOLD ? "#d73a4a" : "#0e8a16",
+                      background: scores[key] > 0.4 ? "#d73a4a" : "#0e8a16",
                       width: `${Math.round(scores[key] * 100)}%`,
                       height: "100%",
                     }}
@@ -140,6 +87,12 @@ export function FaceSignalsDebug() {
           ))}
         </tbody>
       </table>
+      <h2>Events</h2>
+      <ul>
+        {events.map((e, i) => (
+          <li key={i}>{e}</li>
+        ))}
+      </ul>
     </div>
   );
 }

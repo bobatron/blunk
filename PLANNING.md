@@ -10,14 +10,16 @@ Target: playable live demo at a games developer meetup, 3 weeks from project sta
   SFU is needed at 8+ players — peer-to-peer mesh doesn't scale past ~4-6
   participants. Self-hosting a media server is out of scope for v1.
 - **Face signals**: client-side, per player, using MediaPipe Face Landmarker
-  (runs in-browser via WASM, no server round-trip). We plan to consume its
-  blendshape scores (`eyeBlinkLeft/Right`, `jawOpen`, `browOuterUp`, etc.)
-  directly rather than hand-rolling Eye-Aspect-Ratio math — pending
-  validation in issue #7. A shared "face-signals" module exposes typed
-  events (blink, wink, mouth-open/closed, eyebrow-raise) that every mini-game
-  consumes. Each player calibrates for ~3 seconds before a round —
-  lighting/webcam/glasses vary enough that a fixed global threshold won't
-  work.
+  (runs in-browser via WASM, no server round-trip). Confirmed via issue #7's
+  spike: its blendshape scores (`eyeBlinkLeft/Right`, `jawOpen`,
+  `browOuterUp`, etc.) are accurate with simple fixed thresholds — no
+  hand-rolled Eye-Aspect-Ratio math or per-player calibration needed for a
+  first pass. A shared "face-signals" module (`apps/web/src/face-signals`)
+  exposes typed events (blink, wink, mouth-open/closed, eyebrow-raise) that
+  every mini-game consumes. If real-world testing at the meetup later
+  reveals fixed thresholds aren't robust enough across different faces/
+  lighting/webcams, per-player calibration is the fallback — deferred for
+  now since the spike didn't show a need for it.
 - **Game/room orchestration** (`apps/game-server`): a Node WebSocket server
   holding lobby/room state and arbitrating game events. Elimination order in
   the staring contest is decided by **server timestamp**, not client-reported
