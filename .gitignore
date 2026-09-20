@@ -28,3 +28,7 @@ apps/game-server/dist
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# env files (never commit real secrets — see .env.example in each app)
+.env
+.env.local

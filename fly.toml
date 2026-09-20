@@ -1,0 +1,25 @@
+# Deploys apps/game-server. Run all `fly` commands from the repo root so the
+# build context includes the root package.json/package-lock.json needed by
+# the npm workspaces setup — see apps/game-server/Dockerfile.
+#
+# First-time setup:
+#   fly launch --no-deploy   (pick a unique app name, region; it'll find this file)
+#   fly secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... WEB_ORIGIN=https://your-app.vercel.app
+#   fly deploy
+
+app = "blunk-game-server" # change if this name is taken
+primary_region = "lhr"
+
+[build]
+  dockerfile = "apps/game-server/Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
