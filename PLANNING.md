@@ -108,8 +108,9 @@ Mini-games, roughly in priority order:
 
 ## Working agreements
 
-- `main` is always demoable. Short-lived feature branches, merged via PR with
-  at least one review.
+- `main` is always demoable. For now, committing straight to `main` (no
+  branches/PRs) — confirmed 2026-09-20, revisit if/when more people are
+  actively pushing code at the same time.
 - Tickets should be sized under a day, with acceptance criteria in the issue.
 - Async check-in every other day (GitHub Discussion or Discord) — done,
   next, blockers.
