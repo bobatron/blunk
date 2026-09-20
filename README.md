@@ -49,7 +49,12 @@ test multi-participant video/audio.
   push to `main`.
 - **Game server**: deployed to [Fly.io](https://fly.io/) via the root
   `fly.toml` (see the comments in that file for the one-time setup). Run all
-  `fly` commands from the repo root.
+  `fly` commands from the repo root. Auto-deploys on push to `main` when
+  `apps/game-server/**` or `fly.toml` change, via
+  `.github/workflows/deploy-game-server.yml` (needs a `FLY_API_TOKEN` repo
+  secret — generate one with `fly tokens create deploy -a blunk-game-server`
+  and `gh secret set FLY_API_TOKEN`). Runs as a **single machine**
+  (`fly scale count 1`) — see PLANNING.md before changing that.
 
 ## Scripts
 
