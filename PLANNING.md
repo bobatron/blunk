@@ -9,11 +9,15 @@ Target: playable live demo at a games developer meetup, 3 weeks from project sta
 - **Video/audio**: [LiveKit Cloud](https://livekit.io/) (free tier). A proper
   SFU is needed at 8+ players — peer-to-peer mesh doesn't scale past ~4-6
   participants. Self-hosting a media server is out of scope for v1.
-- **Blink detection**: client-side, per player, using MediaPipe Face
-  Landmarker (runs in-browser via WASM, no server round-trip). Detect blinks
-  via Eye Aspect Ratio (EAR) dipping below a threshold. Each player
-  calibrates for ~3 seconds at game start — lighting/webcam/glasses vary
-  enough that a fixed global threshold won't work.
+- **Face signals**: client-side, per player, using MediaPipe Face Landmarker
+  (runs in-browser via WASM, no server round-trip). We plan to consume its
+  blendshape scores (`eyeBlinkLeft/Right`, `jawOpen`, `browOuterUp`, etc.)
+  directly rather than hand-rolling Eye-Aspect-Ratio math — pending
+  validation in issue #7. A shared "face-signals" module exposes typed
+  events (blink, wink, mouth-open/closed, eyebrow-raise) that every mini-game
+  consumes. Each player calibrates for ~3 seconds before a round —
+  lighting/webcam/glasses vary enough that a fixed global threshold won't
+  work.
 - **Game/room orchestration** (`apps/game-server`): a Node WebSocket server
   holding lobby/room state and arbitrating game events. Elimination order in
   the staring contest is decided by **server timestamp**, not client-reported
@@ -21,17 +25,38 @@ Target: playable live demo at a games developer meetup, 3 weeks from project sta
 - **State**: in-memory on the game server for v1. Rooms are ephemeral — no
   database needed yet.
 
+## Game format
+
+Blunk is a **party night**, not a single game: players join a room once,
+the host cycles through mini-games back-to-back, and a running scoreboard
+crowns one overall winner at the end (Jackbox-style) — no re-joining
+between rounds.
+
+Mini-games, roughly in priority order:
+
+1. **Staring Contest** (core) — last player to blink wins.
+2. **Spot the Real Stream** (stretch, likely) — a captured pose is shown
+   live alongside decoy stills; others vote on which feed is real.
+3. **Poker Face** (stretch, likely) — a player privately sees a stimulus and
+   must not react (smile/eyebrow raise/mouth open) while everyone watches.
+4. **Simon Says (Faces)** (stretch, cut first if short on time) —
+   rapid-fire face commands with increasing speed; mistakes eliminate.
+5. **Face Race** (stretch, cut first if short on time) — first player to
+   match a target expression scores a point; low-downtime filler round.
+
 ## Roadmap
 
 - **Week 1 — Plumbing**: join a room, see/hear everyone in a video grid,
   lobby, deploy pipeline working end-to-end. Stress-test an 8-person video
   grid early to surface bandwidth/perf issues while there's time to react.
-- **Week 2 — First game playable**: staring contest end-to-end — calibration,
-  blink detection, server-arbitrated elimination, winner screen.
-- **Week 3 — Second game + hardening**: "spot the real stream" mode
-  (a captured pose is shown live alongside decoy stills; others vote on which
-  feed is real), polish, stress-test at 8 players on real wifi, rehearse the
-  live demo, buffer day before the event.
+  Also validate the face-signals approach (issue #7) before building on it.
+- **Week 2 — First game playable**: shared face-signals library, Staring
+  Contest end-to-end (calibration, detection, server-arbitrated elimination,
+  winner screen), and the party-night core loop (mode select, round
+  transitions, scoreboard).
+- **Week 3 — More games + hardening**: Spot the Real Stream and Poker Face
+  (Simon Says / Face Race only if time allows), polish, stress-test at 8
+  players on real wifi, rehearse the live demo, buffer day before the event.
 
 ## Risks
 
