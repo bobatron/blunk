@@ -2,24 +2,26 @@
 # build context includes the root package.json/package-lock.json needed by
 # the npm workspaces setup — see apps/game-server/Dockerfile.
 #
-# First-time setup:
-#   fly launch --no-deploy   (pick a unique app name, region; it'll find this file)
-#   fly secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... WEB_ORIGIN=https://your-app.vercel.app
+# Already launched (app: blunk-game-server). To redeploy after changes:
 #   fly deploy
+# To update secrets:
+#   fly secrets set LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=... WEB_ORIGIN=https://blunk-web.vercel.app
+#
+# See https://fly.io/docs/reference/configuration/ for full config reference.
 
-app = "blunk-game-server" # change if this name is taken
-primary_region = "lhr"
+app = 'blunk-game-server'
+primary_region = 'lhr'
 
 [build]
-  dockerfile = "apps/game-server/Dockerfile"
+  dockerfile = 'apps/game-server/Dockerfile'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = false
+  auto_stop_machines = 'off'
   auto_start_machines = true
   min_machines_running = 1
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
