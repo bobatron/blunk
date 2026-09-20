@@ -30,19 +30,45 @@ Target: playable live demo at a games developer meetup, 3 weeks from project sta
 Blunk is a **party night**, not a single game: players join a room once,
 the host cycles through mini-games back-to-back, and a running scoreboard
 crowns one overall winner at the end (Jackbox-style) — no re-joining
-between rounds.
+between rounds. Tone throughout is goofy and chaotic, not tense/competitive.
+Works whether the room has 2 or 8+ players.
 
 Mini-games, roughly in priority order:
 
-1. **Staring Contest** (core) — last player to blink wins.
-2. **Spot the Real Stream** (stretch, likely) — a captured pose is shown
-   live alongside decoy stills; others vote on which feed is real.
-3. **Poker Face** (stretch, likely) — a player privately sees a stimulus and
-   must not react (smile/eyebrow raise/mouth open) while everyone watches.
-4. **Simon Says (Faces)** (stretch, cut first if short on time) —
-   rapid-fire face commands with increasing speed; mistakes eliminate.
-5. **Face Race** (stretch, cut first if short on time) — first player to
-   match a target expression scores a point; low-downtime filler round.
+1. **Staring Contest** (core, fully designed — see below).
+2. **Spot the Real Stream** (idea captured, not yet designed in depth — see
+   below).
+3. **Poker Face** (idea only, not yet designed) — a player privately sees a
+   stimulus and must not react (smile/eyebrow raise/mouth open) while
+   everyone watches.
+4. **Simon Says (Faces)** (idea only, not yet designed) — rapid-fire face
+   commands with increasing speed; mistakes eliminate.
+5. **Face Race** (idea only, not yet designed) — first player to match a
+   target expression scores a point; low-downtime filler round.
+
+### Staring Contest
+
+- **Free-for-all**, not paired duels: everyone stares into their own camera
+  at once; whoever the camera catches blinking first is out. Last player
+  remaining wins the round.
+- No artificial pacing mechanism — the round runs as long as it naturally
+  takes; no timers or escalating difficulty.
+- The "BLUNK!" moment is a big, silly spectacle: freeze-frame + zoom on the
+  culprit's face, combined with a whole-room effect (e.g. screen shake,
+  graphics), a loud sound, and a big animated stamp.
+- Eliminated players simply spectate and cheer — no active taunting
+  mechanic.
+
+### Spot the Real Stream
+
+- A photo of the spotlighted player is taken at the start of the round.
+- Every other player's tile displays that still image (decoys); one tile is
+  the spotlighted player's real live feed. Decoy count scales with room
+  size (one decoy per non-spotlighted player), not a fixed number.
+- All other players vote collectively; the majority vote is the single
+  final answer, not scored per individual guesser.
+- Selection method for who gets spotlighted, timing, and exact scoring are
+  still undecided — to be designed when this mode comes up for build.
 
 ## Roadmap
 
