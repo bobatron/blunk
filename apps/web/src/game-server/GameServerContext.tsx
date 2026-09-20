@@ -26,12 +26,6 @@ export function GameServerProvider({
     const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName);
     connectionRef.current = connection;
 
-    // Scoring only needs to know what happened in the round that just
-    // ended, and closures registered below would otherwise capture a stale
-    // `eliminations` from this effect's first render — so track the
-    // current round's eliminations in a plain local instead of state.
-    let roundEliminations: Elimination[] = [];
-
     const unsubs = [
       connection.on("joined", ({ playerId }) => setPlayerId(playerId)),
       connection.on("lobby-state", ({ players, roundActive }) => {
@@ -45,26 +39,19 @@ export function GameServerProvider({
       }),
       connection.on("round-started", () => {
         setRoundActive(true);
-        roundEliminations = [];
         setEliminations([]);
         setWinnerId(undefined);
       }),
       connection.on("player-eliminated", ({ playerId, place }) => {
-        roundEliminations = [...roundEliminations, { playerId, place }];
-        setEliminations(roundEliminations);
+        setEliminations((prev) => [...prev, { playerId, place }]);
       }),
       connection.on("round-over", ({ winnerId }) => {
         setRoundActive(false);
         setWinnerId(winnerId);
-        // Placement scoring: last-place elimination scores 1, each place
-        // earlier scores one more, the winner scores highest of all.
-        const totalPlayers = roundEliminations.length + (winnerId ? 1 : 0);
-        setScores((prev) => {
-          const next = { ...prev };
-          for (const e of roundEliminations) next[e.playerId] = (next[e.playerId] ?? 0) + e.place;
-          if (winnerId) next[winnerId] = (next[winnerId] ?? 0) + totalPlayers;
-          return next;
-        });
+        // A game has exactly one winner — that's the only point awarded.
+        if (winnerId) {
+          setScores((prev) => ({ ...prev, [winnerId]: (prev[winnerId] ?? 0) + 1 }));
+        }
       }),
       connection.on("error", ({ message }) => setErrorMessage(message)),
     ];
