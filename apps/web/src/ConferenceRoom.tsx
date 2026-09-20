@@ -1,12 +1,15 @@
 import { LiveKitRoom, VideoConference } from "@livekit/components-react";
 import { LIVEKIT_URL } from "./config";
 import type { JoinDetails } from "./JoinScreen";
+import { GameServerProvider } from "./game-server/GameServerContext";
+import { LocalFaceSignals } from "./LocalFaceSignals";
+import { StaringContest } from "./StaringContest";
 
 interface Props extends JoinDetails {
   onLeave: () => void;
 }
 
-export function ConferenceRoom({ token, onLeave }: Props) {
+export function ConferenceRoom({ roomName, participantName, token, onLeave }: Props) {
   return (
     <LiveKitRoom
       serverUrl={LIVEKIT_URL}
@@ -17,7 +20,11 @@ export function ConferenceRoom({ token, onLeave }: Props) {
       onDisconnected={onLeave}
       style={{ height: "100vh" }}
     >
-      <VideoConference />
+      <GameServerProvider roomName={roomName} participantName={participantName}>
+        <LocalFaceSignals />
+        <StaringContest />
+        <VideoConference />
+      </GameServerProvider>
     </LiveKitRoom>
   );
 }

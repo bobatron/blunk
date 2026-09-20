@@ -101,9 +101,17 @@ export class FaceSignalsDetector {
 
   private loop = () => {
     if (!this.landmarker) return;
-    const result = this.landmarker.detectForVideo(this.video, performance.now());
-    const categories = result.faceBlendshapes[0]?.categories;
-    if (categories) this.processCategories(categories);
+    // The video may not have a frame ready yet (e.g. stream just attached) —
+    // skip rather than let one bad frame kill the whole detection loop.
+    if (this.video.readyState >= this.video.HAVE_CURRENT_DATA) {
+      try {
+        const result = this.landmarker.detectForVideo(this.video, performance.now());
+        const categories = result.faceBlendshapes[0]?.categories;
+        if (categories) this.processCategories(categories);
+      } catch {
+        // transient — try again next frame
+      }
+    }
     this.rafId = requestAnimationFrame(this.loop);
   };
 

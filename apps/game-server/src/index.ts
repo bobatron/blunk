@@ -13,6 +13,7 @@ interface Room {
   id: string;
   players: Map<string, Player>;
   eliminationOrder: string[];
+  roundActive: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -20,7 +21,7 @@ const rooms = new Map<string, Room>();
 function getOrCreateRoom(roomId: string): Room {
   let room = rooms.get(roomId);
   if (!room) {
-    room = { id: roomId, players: new Map(), eliminationOrder: [] };
+    room = { id: roomId, players: new Map(), eliminationOrder: [], roundActive: false };
     rooms.set(roomId, room);
   }
   return room;
@@ -39,7 +40,29 @@ function lobbyState(room: Room) {
   return {
     type: "lobby-state",
     players: [...room.players.values()].map((p) => ({ id: p.id, name: p.name })),
+    roundActive: room.roundActive,
   };
+}
+
+// Recorded with a server timestamp so near-simultaneous blinks resolve
+// fairly instead of trusting client-reported order. Also used when a
+// player disconnects mid-round, so the round can still complete.
+function eliminate(room: Room, playerId: string) {
+  if (!room.roundActive) return;
+  if (room.eliminationOrder.includes(playerId)) return;
+  room.eliminationOrder.push(playerId);
+  broadcast(room, {
+    type: "player-eliminated",
+    playerId,
+    serverTimestamp: Date.now(),
+    place: room.eliminationOrder.length,
+  });
+
+  const remaining = [...room.players.keys()].filter((id) => !room.eliminationOrder.includes(id));
+  if (remaining.length <= 1) {
+    room.roundActive = false;
+    broadcast(room, { type: "round-over", winnerId: remaining[0] ?? null });
+  }
 }
 
 // --- LiveKit access tokens -------------------------------------------------
@@ -133,18 +156,21 @@ wss.on("connection", (socket) => {
         break;
       }
 
-      // Recorded with a server timestamp so simultaneous blinks resolve
-      // fairly instead of trusting client-reported order.
+      case "start-round": {
+        if (!joinedRoom) return;
+        if (joinedRoom.players.size < 2) {
+          socket.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
+          return;
+        }
+        joinedRoom.roundActive = true;
+        joinedRoom.eliminationOrder = [];
+        broadcast(joinedRoom, { type: "round-started" });
+        break;
+      }
+
       case "blunk": {
         if (!joinedRoom || !playerId) return;
-        if (joinedRoom.eliminationOrder.includes(playerId)) return;
-        joinedRoom.eliminationOrder.push(playerId);
-        broadcast(joinedRoom, {
-          type: "player-eliminated",
-          playerId,
-          serverTimestamp: Date.now(),
-          place: joinedRoom.eliminationOrder.length,
-        });
+        eliminate(joinedRoom, playerId);
         break;
       }
 
@@ -155,6 +181,7 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     if (joinedRoom && playerId) {
+      if (joinedRoom.roundActive) eliminate(joinedRoom, playerId);
       joinedRoom.players.delete(playerId);
       broadcast(joinedRoom, lobbyState(joinedRoom));
       if (joinedRoom.players.size === 0) {
