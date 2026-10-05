@@ -1,10 +1,54 @@
+/* Retheme LiveKit's own prefab components (PreJoin, VideoConference
+   controls) to match the party palette instead of their default blue.
+   Extra ancestor compound selector so this reliably outranks
+   @livekit/components-styles regardless of CSS import order. */
+body [data-lk-theme] {
+  --lk-accent-bg: var(--accent);
+  --lk-accent2: #c45fff;
+  --lk-accent3: #d98cff;
+  --lk-accent4: #ecbfff;
+  --lk-danger: var(--secondary);
+  --lk-border-radius: 12px;
+}
+
 .join-screen {
+  min-height: 100svh;
+  width: 100%;
+  box-sizing: border-box;
+  background: linear-gradient(135deg, #aa3bff 0%, #ff3d81 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+
+.join-card {
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 28px 24px;
   max-width: 420px;
-  margin: 48px auto;
-  padding: 0 20px;
+  width: 100%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
   gap: 16px;
+  box-sizing: border-box;
+}
+
+.join-hero {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.join-hero h1 {
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 44px;
+  letter-spacing: 0.02em;
+  margin: 0;
+  color: var(--accent);
 }
 
 .room-input {
@@ -17,7 +61,7 @@
 .room-input input {
   font-size: 16px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--border, #ccc);
 }
 
@@ -30,6 +74,10 @@
   color: #888;
 }
 
+button {
+  font-family: var(--heading);
+}
+
 .staring-contest-hud {
   position: fixed;
   top: 12px;
@@ -40,18 +88,38 @@
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  font-family: system-ui, sans-serif;
+  font-family: var(--heading);
 }
 
-.staring-contest-hud button {
-  font-size: 18px;
-  font-weight: 700;
-  padding: 10px 20px;
-  border-radius: 8px;
+.staring-contest-hud button,
+.lobby button {
+  font-size: 17px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 999px;
   border: none;
-  background: #aa3bff;
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
   color: white;
   cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s ease;
+}
+
+.staring-contest-hud button:hover,
+.lobby button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.staring-contest-hud button:active,
+.lobby button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.lobby button:disabled {
+  background: #666;
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .round-status {
@@ -68,18 +136,22 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(20, 10, 30, 0.85);
+  backdrop-filter: blur(6px);
   color: white;
-  padding: 16px 20px;
-  border-radius: 12px;
+  padding: 18px 22px;
+  border-radius: 16px;
   text-align: center;
-  font-family: system-ui, sans-serif;
+  font-family: var(--heading);
   min-width: 220px;
 }
 
 .lobby h2 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: 0.02em;
   color: white;
 }
 
@@ -94,7 +166,12 @@
 .last-winner {
   margin: 0 0 8px;
   font-weight: 700;
-  color: #ffd54f;
+  color: var(--gold);
+  animation: winner-bounce 0.6s ease;
+}
+
+.trophy {
+  display: inline-block;
 }
 
 .lobby-players {
@@ -105,23 +182,6 @@
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-.lobby button {
-  margin-top: 8px;
-  font-size: 16px;
-  font-weight: 700;
-  padding: 10px 20px;
-  border-radius: 8px;
-  border: none;
-  background: #aa3bff;
-  color: white;
-  cursor: pointer;
-}
-
-.lobby button:disabled {
-  background: #666;
-  cursor: not-allowed;
 }
 
 .lobby .hint {
@@ -174,8 +234,10 @@
 }
 
 .blunk-stamp {
-  font-size: 96px;
-  font-weight: 900;
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 110px;
+  letter-spacing: 0.03em;
   color: #d73a4a;
   -webkit-text-stroke: 3px white;
   transform: rotate(-8deg);
@@ -183,6 +245,7 @@
 }
 
 .blunk-name {
+  font-family: var(--heading);
   font-size: 28px;
   font-weight: 700;
   color: white;
@@ -208,4 +271,10 @@
   40% { transform: translate(8px, -4px); }
   60% { transform: translate(-6px, -2px); }
   80% { transform: translate(6px, 2px); }
+}
+
+@keyframes winner-bounce {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
 }

@@ -1,24 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
-
-function playBlunkSound() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(300, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.4);
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-    osc.onended = () => ctx.close();
-  } catch {
-    // audio isn't essential — ignore if it fails (autoplay policy, etc.)
-  }
-}
+import { playBlunk, playRoundStart } from "./sounds";
 
 /**
  * The in-round Staring Contest HUD: live status while a round is active,
@@ -28,13 +10,19 @@ function playBlunkSound() {
 export function StaringContest() {
   const { playerId, players, roundActive, eliminations } = useGameServer();
   const [flash, setFlash] = useState<{ name: string; key: number } | null>(null);
+  const wasRoundActive = useRef(false);
+
+  useEffect(() => {
+    if (roundActive && !wasRoundActive.current) playRoundStart();
+    wasRoundActive.current = roundActive;
+  }, [roundActive]);
 
   useEffect(() => {
     if (eliminations.length === 0) return;
     const last = eliminations[eliminations.length - 1];
     const name = players.find((p) => p.id === last.playerId)?.name ?? "Someone";
     setFlash({ name, key: Date.now() });
-    playBlunkSound();
+    playBlunk();
     const timer = setTimeout(() => setFlash(null), 1200);
     return () => clearTimeout(timer);
     // Only fire when a new elimination is appended, not on every players change.

@@ -1,5 +1,7 @@
+import { useEffect, useRef } from "react";
 import { useGameServer } from "./game-server/useGameServer";
 import { Scoreboard } from "./Scoreboard";
+import { playJoin, playWinnerFanfare } from "./sounds";
 
 /**
  * Where players land before a round starts (and again between rounds):
@@ -9,6 +11,20 @@ import { Scoreboard } from "./Scoreboard";
  */
 export function Lobby() {
   const { players, playerNames, roundActive, winnerId, startRound, errorMessage } = useGameServer();
+  const prevPlayerCount = useRef<number | null>(null);
+  const announcedWinner = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (prevPlayerCount.current !== null && players.length > prevPlayerCount.current) playJoin();
+    prevPlayerCount.current = players.length;
+  }, [players.length]);
+
+  useEffect(() => {
+    if (winnerId && winnerId !== announcedWinner.current) {
+      playWinnerFanfare();
+      announcedWinner.current = winnerId;
+    }
+  }, [winnerId]);
 
   if (roundActive) return null;
 
@@ -20,7 +36,15 @@ export function Lobby() {
     <div className="lobby">
       <h2>Lobby</h2>
       {hasPlayedARound && (
-        <p className="last-winner">{winnerName ? `${winnerName} won the last round!` : "Round over."}</p>
+        <p className="last-winner">
+          {winnerName ? (
+            <>
+              <span className="trophy">🏆</span> {winnerName} wins!
+            </>
+          ) : (
+            "Round over."
+          )}
+        </p>
       )}
       <Scoreboard />
       <div className="lobby-players">
