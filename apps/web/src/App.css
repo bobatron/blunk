@@ -1001,9 +1001,3 @@ button {
 .sunglasses.preview.covering {
   filter: drop-shadow(0 0 6px #1ff968);
 }
-
-.sunglasses > span {
-  display: block;
-  line-height: 1;
-  transform-origin: center;
-}

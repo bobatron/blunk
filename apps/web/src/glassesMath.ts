@@ -1,5 +1,8 @@
 import type { Tuning } from "./tuning";
 
+/** Glasses height as a fraction of their width, matching the original tuned shape. */
+export const GLASSES_ASPECT = 0.36;
+
 /** A pair of sunglasses, centred at (x, y) in normalized video coordinates. */
 export interface GlassesPos {
   x: number;
@@ -10,7 +13,7 @@ export interface GlassesPos {
 export function eyeCovered(eye: { x: number; y: number }, g: GlassesPos, t: Tuning): boolean {
   return (
     Math.abs(eye.x - g.x) < (t.glassesWidth / 2) * t.glassesCoverSlack &&
-    Math.abs(eye.y - g.y) < (t.glassesHeight / 2) * t.glassesCoverSlack
+    Math.abs(eye.y - g.y) < ((t.glassesWidth * GLASSES_ASPECT) / 2) * t.glassesCoverSlack
   );
 }
 

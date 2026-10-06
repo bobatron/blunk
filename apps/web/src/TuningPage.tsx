@@ -23,9 +23,8 @@ const SECTIONS: Section[] = [
   {
     title: "Sunglasses (size)",
     sliders: [
-      { key: "glassesWidth", label: "Width, fraction of the screen", min: 0.05, max: 0.8, step: 0.01 },
-      { key: "glassesHeight", label: "Height, fraction of the video", min: 0.02, max: 0.5, step: 0.01 },
-      { key: "glassesCoverSlack", label: "Eye-cover tolerance", min: 0.5, max: 1.5, step: 0.05 },
+      { key: "glassesWidth", label: "Size, fraction of the screen", min: 0.05, max: 0.8, step: 0.01 },
+      { key: "glassesCoverSlack", label: "Eye-cover tolerance", min: 0.3, max: 1.5, step: 0.05 },
     ],
   },
   {
@@ -142,18 +141,10 @@ export function TuningPage() {
               style={{
                 left: "50%",
                 top: "50%",
-                width: `${values.glassesWidth * 100}cqw`,
-                height: `${values.glassesHeight * 100}cqh`,
+                fontSize: `${values.glassesWidth * 100}cqw`,
               }}
             >
-              <span
-                style={{
-                  fontSize: `${values.glassesWidth * 100}cqw`,
-                  transform: `scaleY(${values.glassesHeight / values.glassesWidth})`,
-                }}
-              >
-                🕶️
-              </span>
+              🕶️
             </span>
             {chomp && (
               <div

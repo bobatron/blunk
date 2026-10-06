@@ -28,9 +28,7 @@ export function Sunglasses() {
   const alive = roundActive && (me?.lives ?? 0) > 0;
 
   const layerRef = useRef<HTMLDivElement>(null);
-  const [sprite, setSprite] = useState<{ left: number; top: number; w: number; h: number } | null>(
-    null,
-  );
+  const [sprite, setSprite] = useState<{ left: number; top: number; size: number } | null>(null);
   const glassesRef = useRef<Glasses | null>(null);
 
   // Keep the mask flag in step with the eyes and the current glasses.
@@ -112,12 +110,7 @@ export function Sunglasses() {
       const center = toLayerPx(layer, video, g.x, g.y);
       if (!center) return;
       const scale = Math.max(layer.clientWidth / video.videoWidth, layer.clientHeight / video.videoHeight);
-      setSprite({
-        left: center.x,
-        top: center.y,
-        w: t.glassesWidth * video.videoWidth * scale,
-        h: t.glassesHeight * video.videoHeight * scale,
-      });
+      setSprite({ left: center.x, top: center.y, size: t.glassesWidth * video.videoWidth * scale });
     }, TICK_MS);
     return () => clearInterval(id);
   }, [alive, maskRef, videoRef]);
@@ -125,8 +118,8 @@ export function Sunglasses() {
   return (
     <div ref={layerRef} className="sunglasses-layer">
       {alive && sprite && (
-        <span className="sunglasses" style={{ left: sprite.left, top: sprite.top, width: sprite.w, height: sprite.h }}>
-          <span style={{ fontSize: sprite.w, transform: `scaleY(${sprite.h / sprite.w})` }}>🕶️</span>
+        <span className="sunglasses" style={{ left: sprite.left, top: sprite.top, fontSize: sprite.size }}>
+          🕶️
         </span>
       )}
     </div>
