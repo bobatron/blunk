@@ -814,3 +814,41 @@ button {
   border-radius: 8px;
   display: block;
 }
+
+/* --- End-of-round mouth moments slideshow --- */
+
+.moments-reel {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(10, 4, 20, 0.88);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: white;
+  font-family: var(--heading);
+  pointer-events: none;
+}
+
+.moments-reel h2 {
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 44px;
+  color: var(--gold);
+  margin: 0;
+}
+
+.moments-reel img {
+  width: min(80vw, 480px);
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.moments-reel p {
+  font-size: 22px;
+  font-weight: 600;
+}

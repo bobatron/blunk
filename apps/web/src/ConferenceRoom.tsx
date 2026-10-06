@@ -8,6 +8,7 @@ import { StaringContest } from "./StaringContest";
 import { Lobby } from "./Lobby";
 import { GameGrid } from "./GameGrid";
 import { ControlBar } from "./ControlBar";
+import { MomentsReel } from "./MomentsReel";
 
 // Module-level so LiveKit doesn't see a new options object each render.
 const ROOM_OPTIONS: RoomOptions = {
@@ -46,6 +47,7 @@ export function ConferenceRoom({
           <GameGrid />
           <ControlBar />
         </LocalFaceSignals>
+        <MomentsReel />
         <RoomAudioRenderer />
       </GameServerProvider>
     </LiveKitRoom>

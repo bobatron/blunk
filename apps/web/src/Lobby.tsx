@@ -39,7 +39,6 @@ export function Lobby() {
     bugHunt,
     bugHuntResults,
     startBugHunt,
-    snapshots,
   } = useGameServer();
   const now = useNow(250);
   const prevPlayerCount = useRef<number | null>(null);
@@ -138,19 +137,6 @@ export function Lobby() {
           </>
         )}
       </div>
-      {snapshots.length > 0 && (
-        <div className="lobby-snapshots">
-          <h3>Mouth moments</h3>
-          <div className="snapshot-strip">
-            {snapshots.map((s) => (
-              <figure key={s.id}>
-                <img src={s.image} alt="" />
-                <figcaption>{playerNames[s.playerId] ?? "?"}</figcaption>
-              </figure>
-            ))}
-          </div>
-        </div>
-      )}
       <div className="lobby-players">
         <h3>Players ({players.length})</h3>
         <ul>

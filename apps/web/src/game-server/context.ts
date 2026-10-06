@@ -34,8 +34,11 @@ export interface GameServerState {
   bugHunt: { endsAt: number; eaten: Record<string, number> } | null;
   /** Results of the last Bug Hunt, ranked. */
   bugHuntResults: { playerId: string; eaten: number }[] | null;
-  /** Face snapshots from the current or last round. */
+  /** Face snapshots from the current round. */
   snapshots: { id: number; playerId: string; image: string }[];
+  /** Snapshots from the round that just ended, played once as a slideshow. */
+  reel: { key: number; items: { id: number; playerId: string; image: string }[] } | null;
+  dismissReel: () => void;
   errorMessage: string | null;
   startRound: () => void;
   setConfig: (config: RoomConfig) => void;

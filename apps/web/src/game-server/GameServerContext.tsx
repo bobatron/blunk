@@ -30,6 +30,9 @@ export function GameServerProvider({
   const [bugHunt, setBugHunt] = useState<GameServerState["bugHunt"]>(null);
   const [bugHuntResults, setBugHuntResults] = useState<GameServerState["bugHuntResults"]>(null);
   const [snapshots, setSnapshots] = useState<GameServerState["snapshots"]>([]);
+  const snapshotsRef = useRef<GameServerState["snapshots"]>([]);
+  const [reel, setReel] = useState<GameServerState["reel"]>(null);
+  const reelKey = useRef(0);
 
   useEffect(() => {
     const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName);
@@ -56,6 +59,7 @@ export function GameServerProvider({
         setEliminations([]);
         setWinnerId(undefined);
         setBlinkBreaks({});
+        snapshotsRef.current = [];
         setSnapshots([]);
       }),
       connection.on("life-lost", ({ playerId, livesLeft, reason }) => {
@@ -81,6 +85,10 @@ export function GameServerProvider({
         setRoundActive(false);
         setRoundEndsAt(null);
         setWinnerId(winnerId);
+        if (snapshotsRef.current.length > 0) {
+          reelKey.current += 1;
+          setReel({ key: reelKey.current, items: snapshotsRef.current });
+        }
         // A game has exactly one winner — that's the only point awarded.
         if (winnerId) {
           setScores((prev) => ({ ...prev, [winnerId]: (prev[winnerId] ?? 0) + 1 }));
@@ -95,12 +103,20 @@ export function GameServerProvider({
       }),
       connection.on("bug-hunt-over", ({ results }) => {
         setBugHunt(null);
-        setBugHuntResults([...results].sort((a, b) => b.eaten - a.eaten));
+        const ranked = [...results].sort((a, b) => b.eaten - a.eaten);
+        setBugHuntResults(ranked);
+        // Most bugs eaten earns the point, unless it's a tie for first or nobody ate any.
+        const [first, second] = ranked;
+        if (first && first.eaten > 0 && (!second || second.eaten < first.eaten)) {
+          setScores((prev) => ({ ...prev, [first.playerId]: (prev[first.playerId] ?? 0) + 1 }));
+        }
       }),
       connection.on("round-snapshot", ({ playerId, image }) => {
         snapshotId += 1;
         const id = snapshotId;
-        setSnapshots((prev) => [...prev, { id, playerId, image }]);
+        const item = { id, playerId, image };
+        snapshotsRef.current = [...snapshotsRef.current, item];
+        setSnapshots(snapshotsRef.current);
       }),
       connection.on("error", ({ message }) => setErrorMessage(message)),
     ];
@@ -127,6 +143,8 @@ export function GameServerProvider({
     bugHunt,
     bugHuntResults,
     snapshots,
+    reel,
+    dismissReel: () => setReel(null),
     errorMessage,
     startRound: () => connectionRef.current?.startRound(),
     setConfig: (c) => connectionRef.current?.setConfig(c),
