@@ -136,6 +136,7 @@ export function JoinScreen({ onJoined }: Props) {
           {submitting ? "Joining..." : "Join room"}
         </button>
         {error && <p className="error">{error}</p>}
+        <a className="hint solo-link" href="?game=bugs">Play solo: Bug Hunt</a>
       </form>
     </div>
   );

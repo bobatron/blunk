@@ -1,4 +1,5 @@
 import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
+import { getTuning } from "../tuning";
 
 /**
  * Fixed thresholds, not per-player calibration — issue #7's spike showed
@@ -6,21 +7,9 @@ import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
  * reliable across faces/lighting without it. Revisit if that stops holding
  * up in real-world testing (see PLANNING.md).
  */
-const BLINK_ON = 0.5;
-const BLINK_OFF = 0.3;
-const MOUTH_ON = 0.4;
-const MOUTH_OFF = 0.2;
 const EYEBROW_ON = 0.4;
 const EYEBROW_OFF = 0.2;
 
-/** Consecutive frames an eye must be asymmetric before it counts as a wink,
- * so a normal two-eyed blink (which isn't perfectly synced frame-to-frame)
- * doesn't get misread as a wink. */
-const WINK_DEBOUNCE_FRAMES = 3;
-
-/** How long a face can go undetected before we warn, and before it costs a life. */
-export const EYES_WARNING_MS = 1000;
-export const EYES_MISSING_MS = 3000;
 
 export interface FaceSignalsEvents {
   /** Both eyes closed together. */
@@ -35,11 +24,11 @@ export interface FaceSignalsEvents {
   eyebrowRaise: () => void;
   /** Normalized (0–1) position of the centre of the mouth, in the video frame. */
   mouthPosition: (payload: { x: number; y: number }) => void;
-  /** Face has been undetected for EYES_WARNING_MS. */
+  /** Face has been undetected for the warning delay (tuning: eyesWarningMs). */
   eyesWarning: () => void;
   /** Face is detected again after a warning. */
   eyesFound: () => void;
-  /** Face has been undetected for EYES_MISSING_MS — fires every EYES_MISSING_MS while it lasts. */
+  /** Face has been undetected for the penalty delay (tuning: eyesMissingMs), firing again each period while it lasts. */
   eyesMissing: () => void;
   scores: (payload: {
     eyeBlinkLeft: number;
@@ -149,6 +138,7 @@ export class FaceSignalsDetector {
   };
 
   private updatePresence(present: boolean, now: number) {
+    const t = getTuning();
     if (present) {
       if (this.eyesWarned) this.emit("eyesFound");
       this.eyesWarned = false;
@@ -156,17 +146,18 @@ export class FaceSignalsDetector {
       return;
     }
     const missingMs = now - this.lastFaceAt;
-    if (!this.eyesWarned && missingMs >= EYES_WARNING_MS) {
+    if (!this.eyesWarned && missingMs >= t.eyesWarningMs) {
       this.eyesWarned = true;
       this.emit("eyesWarning");
     }
-    if (missingMs >= EYES_MISSING_MS) {
+    if (missingMs >= t.eyesMissingMs) {
       this.lastFaceAt = now;
       this.emit("eyesMissing");
     }
   }
 
   private processCategories(categories: { categoryName: string; score: number }[]) {
+    const t = getTuning();
     const get = (name: string) => categories.find((c) => c.categoryName === name)?.score ?? 0;
 
     const eyeBlinkLeft = get("eyeBlinkLeft");
@@ -177,8 +168,8 @@ export class FaceSignalsDetector {
     this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp });
 
     // Blink: both eyes closed together.
-    const bothClosed = eyeBlinkLeft > BLINK_ON && eyeBlinkRight > BLINK_ON;
-    const bothOpen = eyeBlinkLeft < BLINK_OFF && eyeBlinkRight < BLINK_OFF;
+    const bothClosed = eyeBlinkLeft > t.blinkOn && eyeBlinkRight > t.blinkOn;
+    const bothOpen = eyeBlinkLeft < t.blinkOff && eyeBlinkRight < t.blinkOff;
     if (bothClosed && !this.eyesClosed) {
       this.eyesClosed = true;
       this.emit("blink");
@@ -187,7 +178,7 @@ export class FaceSignalsDetector {
     }
 
     // Eye closed: either eye, blink or wink — no dodging via single-eye winks.
-    const eitherClosed = eyeBlinkLeft > BLINK_ON || eyeBlinkRight > BLINK_ON;
+    const eitherClosed = eyeBlinkLeft > t.blinkOn || eyeBlinkRight > t.blinkOn;
     if (eitherClosed && !this.anyEyeClosed) {
       this.anyEyeClosed = true;
       this.emit("eyeClosed");
@@ -196,18 +187,18 @@ export class FaceSignalsDetector {
     }
 
     // Wink: one eye closed, the other clearly open, held for a few frames.
-    const leftAsymmetric = eyeBlinkLeft > BLINK_ON && eyeBlinkRight < BLINK_OFF;
-    const rightAsymmetric = eyeBlinkRight > BLINK_ON && eyeBlinkLeft < BLINK_OFF;
+    const leftAsymmetric = eyeBlinkLeft > t.blinkOn && eyeBlinkRight < t.blinkOff;
+    const rightAsymmetric = eyeBlinkRight > t.blinkOn && eyeBlinkLeft < t.blinkOff;
     this.leftWinkFrames = leftAsymmetric ? this.leftWinkFrames + 1 : 0;
     this.rightWinkFrames = rightAsymmetric ? this.rightWinkFrames + 1 : 0;
-    if (this.leftWinkFrames === WINK_DEBOUNCE_FRAMES) this.emit("wink", { eye: "left" });
-    if (this.rightWinkFrames === WINK_DEBOUNCE_FRAMES) this.emit("wink", { eye: "right" });
+    if (this.leftWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "left" });
+    if (this.rightWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "right" });
 
     // Mouth open/closed.
-    if (jawOpen > MOUTH_ON && !this.mouthOpenState) {
+    if (jawOpen > t.mouthOn && !this.mouthOpenState) {
       this.mouthOpenState = true;
       this.emit("mouthOpen");
-    } else if (jawOpen < MOUTH_OFF && this.mouthOpenState) {
+    } else if (jawOpen < t.mouthOff && this.mouthOpenState) {
       this.mouthOpenState = false;
       this.emit("mouthClosed");
     }
