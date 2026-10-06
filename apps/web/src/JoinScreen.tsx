@@ -1,5 +1,4 @@
-import { useState } from "react";
-import { PreJoin, type LocalUserChoices } from "@livekit/components-react";
+import { useEffect, useRef, useState } from "react";
 import { GAME_SERVER_URL } from "./config";
 import { Logo } from "./Logo";
 
@@ -17,15 +16,47 @@ interface Props {
 
 export function JoinScreen({ onJoined }: Props) {
   const [roomName, setRoomName] = useState("lobby");
+  const [participantName, setParticipantName] = useState("");
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previewRef = useRef<HTMLVideoElement>(null);
 
-  async function handleSubmit(choices: LocalUserChoices) {
+  // Preview always uses the front-facing camera — no device picker.
+  useEffect(() => {
+    if (!videoEnabled) return;
+    let stream: MediaStream | null = null;
+    let cancelled = false;
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: { ideal: "user" } } })
+      .then((s) => {
+        if (cancelled) {
+          s.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        stream = s;
+        if (previewRef.current) previewRef.current.srcObject = s;
+      })
+      .catch((err: Error) => setError(`Camera unavailable: ${err.message}`));
+    return () => {
+      cancelled = true;
+      stream?.getTracks().forEach((t) => t.stop());
+    };
+  }, [videoEnabled]);
+
+  const canJoin = participantName.trim().length > 0 && roomName.length > 0 && !submitting;
+
+  async function handleJoin(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canJoin) return;
     setError(null);
+    setSubmitting(true);
     try {
       const res = await fetch(`${GAME_SERVER_URL}/token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ roomName, participantName: choices.username }),
+        body: JSON.stringify({ roomName, participantName: participantName.trim() }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -34,28 +65,41 @@ export function JoinScreen({ onJoined }: Props) {
       const { token } = await res.json();
       onJoined({
         roomName,
-        participantName: choices.username,
+        participantName: participantName.trim(),
         token,
-        audioEnabled: choices.audioEnabled,
-        videoEnabled: choices.videoEnabled,
+        audioEnabled,
+        videoEnabled,
       });
     } catch (err) {
       setError((err as Error).message);
+      setSubmitting(false);
     }
   }
 
   return (
     <div className="join-screen">
-      <div className="join-card">
+      <form className="join-card" onSubmit={handleJoin}>
         <div className="join-hero">
           <Logo size={48} />
           <h1>Blunk</h1>
         </div>
         <p>Join a room, camera on, don't blink.</p>
-        <p className="hint">
-          Playing with others in the same physical room? Turn your mic off below to avoid audio
-          feedback.
-        </p>
+
+        {videoEnabled ? (
+          <video ref={previewRef} className="join-preview" autoPlay muted playsInline />
+        ) : (
+          <div className="join-preview join-preview-off">Camera off</div>
+        )}
+
+        <label className="room-input">
+          Your name
+          <input
+            value={participantName}
+            onChange={(e) => setParticipantName(e.target.value)}
+            placeholder="Name"
+            maxLength={24}
+          />
+        </label>
         <label className="room-input">
           Room code
           <input
@@ -64,14 +108,35 @@ export function JoinScreen({ onJoined }: Props) {
             placeholder="lobby"
           />
         </label>
-        <PreJoin
-          defaults={{ username: "" }}
-          onValidate={(values) => values.username.trim().length > 0 && roomName.length > 0}
-          onSubmit={handleSubmit}
-          onError={(err) => setError(err.message)}
-        />
+
+        <div className="toggle-row">
+          <button
+            type="button"
+            className={`toggle ${videoEnabled ? "on" : "off"}`}
+            aria-pressed={videoEnabled}
+            onClick={() => setVideoEnabled((v) => !v)}
+          >
+            Camera {videoEnabled ? "on" : "off"}
+          </button>
+          <button
+            type="button"
+            className={`toggle ${audioEnabled ? "on" : "off"}`}
+            aria-pressed={audioEnabled}
+            onClick={() => setAudioEnabled((v) => !v)}
+          >
+            Mic {audioEnabled ? "on" : "off"}
+          </button>
+        </div>
+        <p className="hint">
+          Playing with others in the same physical room? Turn your mic off to avoid audio feedback.
+          The game needs your camera on to play.
+        </p>
+
+        <button type="submit" className="join-button" disabled={!canJoin}>
+          {submitting ? "Joining..." : "Join room"}
+        </button>
         {error && <p className="error">{error}</p>}
-      </div>
+      </form>
     </div>
   );
 }
