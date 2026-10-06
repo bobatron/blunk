@@ -24,6 +24,8 @@ export interface FaceSignalsEvents {
   eyebrowRaise: () => void;
   /** Normalized (0–1) centres of each eye's iris, in the video frame. */
   eyePositions: (payload: { left: { x: number; y: number }; right: { x: number; y: number } }) => void;
+  /** Every blendshape this frame, by name, for diagnosing detection. */
+  blendshapes: (payload: Record<string, number>) => void;
   /** Tongue sticks out (rising edge). */
   tongueOut: () => void;
   /** Normalized (0–1) position of the centre of the mouth, in the video frame. */
@@ -179,6 +181,9 @@ export class FaceSignalsDetector {
     const browOuterUp = (get("browOuterUpLeft") + get("browOuterUpRight")) / 2;
 
     this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp, tongueOut: get("tongueOut") });
+    const all: Record<string, number> = {};
+    for (const c of categories) all[c.categoryName] = c.score;
+    this.emit("blendshapes", all);
 
     // Blink: both eyes closed together.
     const bothClosed = eyeBlinkLeft > t.blinkOn && eyeBlinkRight > t.blinkOn;

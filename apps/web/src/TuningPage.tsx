@@ -173,6 +173,7 @@ export function TuningPage() {
           <LiveBar label="jawOpen" value={live.jawOpen} threshold={values.mouthOn} />
           <LiveBar label="browOuterUp" value={live.browOuterUp} threshold={0.4} />
           <LiveBar label="tongueOut" value={live.tongueOut} threshold={values.tongueOn} />
+          <TopBlendshapes detector={detector} />
           <div className="tuning-actions">
             <button type="button" className="join-button" onClick={copySettings}>
               {copied ? "Copied" : "Copy settings"}
@@ -243,6 +244,49 @@ function useLiveScores(detector: { on: (e: "scores", h: (p: Live) => void) => ()
   }, [detector]);
 
   return shown;
+}
+
+/** Diagnostic: the strongest blendshapes right now, whatever they're called. */
+function TopBlendshapes({
+  detector,
+}: {
+  detector: { on: (e: "blendshapes", h: (p: Record<string, number>) => void) => () => void } | null;
+}) {
+  const latest = useRef<Record<string, number>>({});
+  const [top, setTop] = useState<[string, number][]>([]);
+
+  useEffect(() => {
+    if (!detector) return;
+    const off = detector.on("blendshapes", (all) => {
+      latest.current = all;
+    });
+    const id = setInterval(() => {
+      setTop(
+        Object.entries(latest.current)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 8),
+      );
+    }, 200);
+    return () => {
+      off();
+      clearInterval(id);
+    };
+  }, [detector]);
+
+  return (
+    <div className="top-blendshapes">
+      <p className="hint">Strongest blendshapes right now (stick your tongue out and watch):</p>
+      {top.map(([name, score]) => (
+        <div key={name} className="live-row">
+          <span className="live-label">{name}</span>
+          <div className="live-track">
+            <div className="live-fill" style={{ width: `${Math.round(score * 100)}%` }} />
+          </div>
+          <output>{score.toFixed(2)}</output>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function LiveBar({ label, value, threshold }: { label: string; value: number; threshold: number }) {
