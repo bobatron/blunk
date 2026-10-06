@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { DEFAULT_TUNING, resetTuning, setTuning, useTuning, type Tuning } from "./tuning";
 import { useStandaloneFace } from "./useStandaloneFace";
+import { BugField, type Chomp } from "./BugField";
 
 interface Slider {
   key: keyof Tuning;
@@ -60,6 +61,13 @@ export function TuningPage() {
   const { detector, status } = useStandaloneFace(videoRef);
   const values = useTuning();
   const [copied, setCopied] = useState(false);
+  const [chomp, setChomp] = useState<(Chomp & { key: number }) | null>(null);
+  const chompCount = useRef(0);
+
+  function onChomp(c: Chomp) {
+    chompCount.current += 1;
+    setChomp({ ...c, key: chompCount.current });
+  }
 
   const live = useLiveScores(detector);
 
@@ -87,7 +95,34 @@ export function TuningPage() {
 
       <div className="tuning-body">
         <section className="tuning-live">
-          <video ref={videoRef} className="tuning-video" muted playsInline />
+          <div className="tuning-stage">
+            <video ref={videoRef} className="tuning-video" muted playsInline />
+            <BugField
+              mode="local"
+              active
+              detector={detector}
+              videoRef={videoRef}
+              onEat={() => undefined}
+              onChomp={onChomp}
+            />
+            {chomp && (
+              <div
+                key={chomp.key}
+                className={`chomp-ring ${chomp.hit ? "hit" : "miss"}`}
+                style={{
+                  left: chomp.x - chomp.radius,
+                  top: chomp.y - chomp.radius,
+                  width: chomp.radius * 2,
+                  height: chomp.radius * 2,
+                }}
+              >
+                <span className="chomp-label">
+                  {chomp.hit ? "HIT" : "MISS"} · radius {Math.round(chomp.radius)}px
+                  {chomp.nearest !== null && ` · nearest bug ${Math.round(chomp.nearest)}px`}
+                </span>
+              </div>
+            )}
+          </div>
           <p className="hint">{detector ? "Live face readings" : status}</p>
           <LiveBar label="eyeBlinkLeft" value={live.eyeBlinkLeft} threshold={values.blinkOn} />
           <LiveBar label="eyeBlinkRight" value={live.eyeBlinkRight} threshold={values.blinkOn} />

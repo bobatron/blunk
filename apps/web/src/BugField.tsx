@@ -66,7 +66,16 @@ function toLayerPx(
   return { x: ox + (1 - nx) * vw * scale, y: oy + ny * vh * scale };
 }
 
-type Props =
+/** One mouth-close, with the eat area it was checked against. */
+export interface Chomp {
+  x: number;
+  y: number;
+  radius: number;
+  hit: boolean;
+  nearest: number | null;
+}
+
+type Props = (
   | {
       mode: "local";
       active: boolean;
@@ -81,7 +90,11 @@ type Props =
       videoRef: RefObject<HTMLVideoElement | null>;
       bugs: HuntBug[];
       onClaim: (bugId: number) => void;
-    };
+    }
+) & {
+  /** Reports every mouth-close with the eat radius and nearest bug, for tuning. */
+  onChomp?: (chomp: Chomp) => void;
+};
 
 /**
  * Bugs on a player's face-cam. In "local" mode each player has their own
@@ -102,11 +115,13 @@ export function BugField(props: Props) {
   const sharedRef = useRef<HuntBug[]>([]);
   const onEatRef = useRef<(() => void) | null>(null);
   const onClaimRef = useRef<((id: number) => void) | null>(null);
+  const onChompRef = useRef<((c: Chomp) => void) | undefined>(undefined);
   const modeRef = useRef(props.mode);
 
   // Keep the latest props visible to the timers and detector callbacks.
   useEffect(() => {
     modeRef.current = props.mode;
+    onChompRef.current = props.onChomp;
     if (props.mode === "shared") {
       sharedRef.current = props.bugs;
       onClaimRef.current = props.onClaim;
@@ -138,7 +153,10 @@ export function BugField(props: Props) {
           h,
           Date.now(),
         );
-        const hit = current.find((b) => Math.hypot(b.x - mouth.x, b.y - mouth.y) < radius);
+        const distances = current.map((b) => ({ b, d: Math.hypot(b.x - mouth.x, b.y - mouth.y) }));
+        const nearest = distances.reduce<number | null>((m, { d }) => (m === null || d < m ? d : m), null);
+        const hit = distances.find(({ d }) => d < radius)?.b;
+        onChompRef.current?.({ x: mouth.x, y: mouth.y, radius, hit: Boolean(hit), nearest });
         if (!hit) return;
         if (modeRef.current === "shared") {
           onClaimRef.current?.(hit.id);
