@@ -139,9 +139,21 @@ export function TuningPage() {
             />
             <span
               className={`sunglasses preview${covered ? " covering" : ""}`}
-              style={{ left: "50%", top: "50%", fontSize: `calc(${values.glassesWidth} * 100cqw)` }}
+              style={{
+                left: "50%",
+                top: "50%",
+                width: `${values.glassesWidth * 100}cqw`,
+                height: `${values.glassesHeight * 100}cqh`,
+              }}
             >
-              🕶️
+              <span
+                style={{
+                  fontSize: `${values.glassesWidth * 100}cqw`,
+                  transform: `scaleY(${values.glassesHeight / values.glassesWidth})`,
+                }}
+              >
+                🕶️
+              </span>
             </span>
             {chomp && (
               <div
