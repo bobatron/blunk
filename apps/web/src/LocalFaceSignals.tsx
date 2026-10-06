@@ -3,6 +3,7 @@ import { useLocalParticipant } from "@livekit/components-react";
 import { FaceSignalsDetector } from "./face-signals/FaceSignalsDetector";
 import { useGameServer } from "./game-server/useGameServer";
 import { LocalFaceContext } from "./localFace";
+import { captureFace } from "./captureFace";
 
 /**
  * Runs face detection on the local participant's own camera feed and reports
@@ -50,6 +51,14 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
       }),
       d.on("eyesWarning", () => setEyesWarning(true)),
       d.on("eyesFound", () => setEyesWarning(false)),
+      d.on("mouthOpen", () => {
+        const g = gameRef.current;
+        const alive = (g.players.find((p) => p.id === g.playerId)?.lives ?? 0) > 0;
+        if (!g.roundActive || !alive) return;
+        const video = videoRef.current;
+        const image = video ? captureFace(video) : null;
+        if (image) g.sendSnapshot(image);
+      }),
       d.on("eyesMissing", () => {
         if (!isOut()) gameRef.current.sendEyesMissing();
       }),

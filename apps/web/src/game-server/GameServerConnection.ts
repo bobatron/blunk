@@ -11,6 +11,20 @@ export interface LobbyPlayer {
   powerups: number;
 }
 
+export interface PathPoint {
+  t: number;
+  x: number;
+  y: number;
+}
+
+/** A Bug Hunt bug as the server sends it: times are on the server's clock. */
+export interface ServerBug {
+  id: number;
+  spawnAt: number;
+  expiresAt: number;
+  path: PathPoint[];
+}
+
 export interface GameServerEvents {
   joined: (payload: { playerId: string; roomId: string }) => void;
   "lobby-state": (payload: { players: LobbyPlayer[]; roundActive: boolean; config: RoomConfig }) => void;
@@ -23,7 +37,9 @@ export interface GameServerEvents {
   "player-eliminated": (payload: { playerId: string; serverTimestamp: number; place: number }) => void;
   "blink-break": (payload: { playerId: string; until: number }) => void;
   "round-over": (payload: { winnerId: string | null }) => void;
-  "bug-hunt-started": (payload: { endsAt: number }) => void;
+  "bug-hunt-started": (payload: { endsAt: number; serverNow: number }) => void;
+  "bug-spawn": (payload: { bug: ServerBug; serverNow: number }) => void;
+  "bug-claimed": (payload: { bugId: number; playerId: string }) => void;
   "bug-hunt-scores": (payload: { eaten: Record<string, number> }) => void;
   "bug-hunt-over": (payload: { results: { playerId: string; eaten: number }[] }) => void;
   "round-snapshot": (payload: { playerId: string; image: string }) => void;
@@ -107,8 +123,8 @@ export class GameServerConnection {
     this.send({ type: "start-bug-hunt" });
   }
 
-  bugEaten(): void {
-    this.send({ type: "bug-eaten" });
+  claimBug(bugId: number): void {
+    this.send({ type: "bug-claim", bugId });
   }
 
   sendSnapshot(image: string): void {

@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { FaceSignalsDetector } from "./face-signals/FaceSignalsDetector";
+import type { HuntBug } from "./game-server/context";
 import { getTuning } from "./tuning";
 
+/** A bug on this player's screen, positioned in tile-normalized (0–1) space. */
 interface Bug {
   id: number;
   x: number;
   y: number;
-  /** Heading in radians; changes at random intervals so the path is erratic. */
+}
+
+interface LocalBug extends Bug {
   angle: number;
   speed: number;
   turnAt: number;
@@ -14,10 +18,9 @@ interface Bug {
 }
 
 const TICK_MS = 40;
-
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-function randomBug(id: number, w: number, h: number, now: number): Bug {
+function randomLocalBug(id: number, w: number, h: number, now: number): LocalBug {
   const t = getTuning();
   return {
     id,
@@ -30,118 +33,164 @@ function randomBug(id: number, w: number, h: number, now: number): Bug {
   };
 }
 
-interface Props {
-  /** Bugs only appear and move while active. */
-  active: boolean;
-  detector: FaceSignalsDetector | null;
-  /** The video whose frame the mouth position is measured against. */
-  videoRef: RefObject<HTMLVideoElement | null>;
-  onEat: () => void;
-  eatLabel: string;
-  /** Fires when the mouth opens with a bug close by, before it's eaten. */
-  onMouthOpenNearBug?: () => void;
+/** Where a shared bug is at time `now`, interpolated along its server-sent path. */
+function pointOnPath(bug: HuntBug, now: number): { x: number; y: number } | null {
+  const pts = bug.path;
+  if (now < pts[0].t || now > pts[pts.length - 1].t) return null;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i];
+    const b = pts[i + 1];
+    if (now >= a.t && now <= b.t) {
+      const f = (now - a.t) / (b.t - a.t);
+      return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f };
+    }
+  }
+  return null;
 }
 
+/** Layer px for a mouth position in the (mirrored, object-fit: cover) video. */
+function toLayerPx(
+  layer: HTMLElement,
+  video: HTMLVideoElement,
+  nx: number,
+  ny: number,
+): { x: number; y: number } | null {
+  if (!video.videoWidth || !video.videoHeight) return null;
+  const w = layer.clientWidth;
+  const h = layer.clientHeight;
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  const scale = Math.max(w / vw, h / vh);
+  const ox = (w - vw * scale) / 2;
+  const oy = (h - vh * scale) / 2;
+  return { x: ox + (1 - nx) * vw * scale, y: oy + ny * vh * scale };
+}
+
+type Props =
+  | {
+      mode: "local";
+      active: boolean;
+      detector: FaceSignalsDetector | null;
+      videoRef: RefObject<HTMLVideoElement | null>;
+      onEat: () => void;
+    }
+  | {
+      mode: "shared";
+      active: boolean;
+      detector: FaceSignalsDetector | null;
+      videoRef: RefObject<HTMLVideoElement | null>;
+      bugs: HuntBug[];
+      onClaim: (bugId: number) => void;
+    };
+
 /**
- * Bugs drift over a face-cam, and if the player opens and closes their mouth
- * over one, it's eaten. Fills its parent (position: absolute, inset: 0).
- * Every number comes from the tuning store, so it can be dialled live.
+ * Bugs on a player's face-cam. In "local" mode each player has their own
+ * bugs that drift randomly and are eaten for a power-up or a solo score. In
+ * "shared" mode the bugs come from the server, so everyone sees the same bug
+ * in the same place, and eating one sends a claim.
+ *
+ * Eating is detected by the mouth closing over a bug. Fills its parent
+ * (position: absolute, inset: 0).
  */
-export function BugField({ active, detector, videoRef, onEat, eatLabel, onMouthOpenNearBug }: Props) {
+export function BugField(props: Props) {
+  const { active, detector, videoRef } = props;
   const layerRef = useRef<HTMLDivElement>(null);
   const [bugs, setBugs] = useState<Bug[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
-  const bugsRef = useRef(bugs);
-  bugsRef.current = bugs;
-  const onEatRef = useRef(onEat);
-  onEatRef.current = onEat;
-  const onNearRef = useRef(onMouthOpenNearBug);
-  onNearRef.current = onMouthOpenNearBug;
-  const mouthRef = useRef<{ x: number; y: number } | null>(null); // in layer px
+  const localRef = useRef<LocalBug[]>([]);
   const nextId = useRef(1);
+  const mouthRef = useRef<{ x: number; y: number } | null>(null); // in layer px
+  const sharedRef = useRef<HuntBug[]>([]);
+  const onEatRef = useRef<(() => void) | null>(null);
+  const onClaimRef = useRef<((id: number) => void) | null>(null);
+  const modeRef = useRef(props.mode);
 
-  // Map the normalized mouth position into layer pixels, accounting for the
-  // video being object-fit: cover and mirrored for self-view.
-  function toLayerPx(nx: number, ny: number): { x: number; y: number } | null {
-    const layer = layerRef.current;
-    const video = videoRef.current;
-    if (!layer || !video || !video.videoWidth || !video.videoHeight) return null;
-    const w = layer.clientWidth;
-    const h = layer.clientHeight;
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    const scale = Math.max(w / vw, h / vh);
-    const ox = (w - vw * scale) / 2;
-    const oy = (h - vh * scale) / 2;
-    return { x: ox + (1 - nx) * vw * scale, y: oy + ny * vh * scale };
-  }
+  // Keep the latest props visible to the timers and detector callbacks.
+  useEffect(() => {
+    modeRef.current = props.mode;
+    if (props.mode === "shared") {
+      sharedRef.current = props.bugs;
+      onClaimRef.current = props.onClaim;
+    } else {
+      onEatRef.current = props.onEat;
+    }
+  });
 
   useEffect(() => {
     if (!detector) return;
     const offs = [
       detector.on("mouthPosition", (p) => {
-        mouthRef.current = toLayerPx(p.x, p.y);
-      }),
-      detector.on("mouthOpen", () => {
-        const mouth = mouthRef.current;
-        if (!mouth || !onNearRef.current) return;
-        const reach = getTuning().bugEatRadiusPx * 2;
-        if (bugsRef.current.some((b) => Math.hypot(b.x - mouth.x, b.y - mouth.y) < reach)) {
-          onNearRef.current();
-        }
+        const layer = layerRef.current;
+        const video = videoRef.current;
+        mouthRef.current = layer && video ? toLayerPx(layer, video, p.x, p.y) : null;
       }),
       detector.on("mouthClosed", () => {
         const mouth = mouthRef.current;
-        if (!mouth) return;
+        const layer = layerRef.current;
+        if (!mouth || !layer) return;
         const radius = getTuning().bugEatRadiusPx;
-        const hit = bugsRef.current.find((b) => Math.hypot(b.x - mouth.x, b.y - mouth.y) < radius);
+        const w = layer.clientWidth;
+        const h = layer.clientHeight;
+        const current = currentPositions(
+          modeRef.current,
+          localRef.current,
+          sharedRef.current,
+          w,
+          h,
+          Date.now(),
+        );
+        const hit = current.find((b) => Math.hypot(b.x - mouth.x, b.y - mouth.y) < radius);
         if (!hit) return;
-        setBugs((prev) => prev.filter((b) => b.id !== hit.id));
-        onEatRef.current();
-        setToast(eatLabel);
-        setTimeout(() => setToast(null), 1500);
+        if (modeRef.current === "shared") {
+          onClaimRef.current?.(hit.id);
+        } else {
+          localRef.current = localRef.current.filter((b) => b.id !== hit.id);
+          setBugs(localRef.current.map(({ id, x, y }) => ({ id, x, y })));
+          onEatRef.current?.();
+        }
       }),
     ];
     return () => offs.forEach((off) => off());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detector, eatLabel]);
+  }, [detector, videoRef]);
 
-  // Bugs appear now and then while active.
+  // Local mode: spawn bugs now and then.
+  useEffect(() => {
+    if (!active || props.mode !== "local") {
+      localRef.current = [];
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout>;
+    const spawn = () => {
+      const layer = layerRef.current;
+      if (layer) {
+        localRef.current = [
+          ...localRef.current,
+          randomLocalBug(nextId.current++, layer.clientWidth, layer.clientHeight, Date.now()),
+        ];
+      }
+      const t = getTuning();
+      timer = setTimeout(spawn, rand(t.bugSpawnMinMs, Math.max(t.bugSpawnMinMs, t.bugSpawnMaxMs)));
+    };
+    timer = setTimeout(spawn, getTuning().bugFirstSpawnMs);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, props.mode]);
+
+  // Move and redraw on a timer: local bugs wander, shared bugs follow their path.
   useEffect(() => {
     if (!active) {
       setBugs([]);
       return;
     }
-    let timer: ReturnType<typeof setTimeout>;
-    const scheduleNext = (delay: number) => {
-      timer = setTimeout(spawn, delay);
-    };
-    const spawn = () => {
-      const layer = layerRef.current;
-      if (layer) {
-        const bug = randomBug(nextId.current++, layer.clientWidth, layer.clientHeight, Date.now());
-        setBugs((prev) => [...prev, bug]);
-      }
-      const t = getTuning();
-      scheduleNext(rand(t.bugSpawnMinMs, Math.max(t.bugSpawnMinMs, t.bugSpawnMaxMs)));
-    };
-    scheduleNext(getTuning().bugFirstSpawnMs);
-    return () => clearTimeout(timer);
-  }, [active]);
-
-  // Move bugs in erratic, jittery paths, bounce off edges, and drop them on expiry.
-  useEffect(() => {
-    if (!active) return;
     const interval = setInterval(() => {
       const layer = layerRef.current;
       if (!layer) return;
       const w = layer.clientWidth;
       const h = layer.clientHeight;
-      const dt = TICK_MS / 1000;
       const now = Date.now();
-      const t = getTuning();
-      setBugs((prev) =>
-        prev
+      if (modeRef.current === "local") {
+        const dt = TICK_MS / 1000;
+        const t = getTuning();
+        localRef.current = localRef.current
           .filter((b) => b.expiresAt > now)
           .map((b) => {
             let angle = b.angle;
@@ -162,8 +211,9 @@ export function BugField({ active, detector, videoRef, onEat, eatLabel, onMouthO
               y = Math.min(Math.max(y, 0), h);
             }
             return { ...b, x, y, angle, turnAt };
-          }),
-      );
+          });
+      }
+      setBugs(currentPositions(modeRef.current, localRef.current, sharedRef.current, w, h, now));
     }, TICK_MS);
     return () => clearInterval(interval);
   }, [active]);
@@ -175,7 +225,27 @@ export function BugField({ active, detector, videoRef, onEat, eatLabel, onMouthO
           🐞
         </span>
       ))}
-      {toast && <div className="powerup-toast">{toast}</div>}
     </div>
   );
+}
+
+/** Pixel positions of the bugs visible right now, in the current mode. */
+function currentPositions(
+  mode: "local" | "shared",
+  local: LocalBug[],
+  shared: HuntBug[],
+  w: number,
+  h: number,
+  now: number,
+): Bug[] {
+  if (mode === "local") {
+    return local.filter((b) => b.expiresAt > now).map(({ id, x, y }) => ({ id, x, y }));
+  }
+  const out: Bug[] = [];
+  for (const b of shared) {
+    if (b.expiresAt <= now) continue;
+    const p = pointOnPath(b, now);
+    if (p) out.push({ id: b.id, x: p.x * w, y: p.y * h });
+  }
+  return out;
 }

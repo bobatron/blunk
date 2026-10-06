@@ -852,3 +852,32 @@ button {
   font-size: 22px;
   font-weight: 600;
 }
+
+/* Mouth moments: a looping card in the lobby (overrides the earlier overlay) */
+.moments-reel {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+}
+
+.moments-reel h3 {
+  margin: 0;
+}
+
+.moments-reel img {
+  width: 200px;
+  height: 150px;
+  box-shadow: none;
+  border-radius: 10px;
+}
+
+.moments-reel p {
+  font-size: 14px;
+  font-weight: 600;
+}

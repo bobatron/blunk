@@ -43,11 +43,11 @@ export function BugGame() {
       <div className="bug-stage">
         <video ref={videoRef} className="bug-video" muted playsInline />
         <BugField
+          mode="local"
           active={phase === "playing"}
           detector={detector}
           videoRef={videoRef}
           onEat={() => setEaten((n) => n + 1)}
-          eatLabel="Bug eaten!"
         />
       </div>
       <div className="bug-hud">

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { GameServerConnection, type LobbyPlayer, type RoomConfig } from "./GameServerConnection";
 import { GAME_SERVER_URL } from "../config";
-import { GameServerContext, type Elimination, type GameServerState, type LifeLostEvent } from "./context";
+import {
+  GameServerContext,
+  type Elimination,
+  type GameServerState,
+  type HuntBug,
+  type LifeLostEvent,
+} from "./context";
 
 const DEFAULT_CONFIG: RoomConfig = { lives: 3, timeLimitSec: 90 };
 
@@ -28,11 +34,14 @@ export function GameServerProvider({
   const [lastLifeLost, setLastLifeLost] = useState<LifeLostEvent | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bugHunt, setBugHunt] = useState<GameServerState["bugHunt"]>(null);
+  const [huntClaim, setHuntClaim] = useState<GameServerState["huntClaim"]>(null);
   const [bugHuntResults, setBugHuntResults] = useState<GameServerState["bugHuntResults"]>(null);
   const [snapshots, setSnapshots] = useState<GameServerState["snapshots"]>([]);
   const snapshotsRef = useRef<GameServerState["snapshots"]>([]);
   const [reel, setReel] = useState<GameServerState["reel"]>(null);
   const reelKey = useRef(0);
+  // Server-clock to browser-clock offset, refreshed whenever the server sends a time.
+  const clockOffset = useRef(0);
 
   useEffect(() => {
     const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName);
@@ -54,6 +63,7 @@ export function GameServerProvider({
         });
       }),
       connection.on("round-started", ({ endsAt }) => {
+        setReel(null);
         setRoundActive(true);
         setRoundEndsAt(endsAt);
         setEliminations([]);
@@ -94,9 +104,26 @@ export function GameServerProvider({
           setScores((prev) => ({ ...prev, [winnerId]: (prev[winnerId] ?? 0) + 1 }));
         }
       }),
-      connection.on("bug-hunt-started", ({ endsAt }) => {
-        setBugHunt({ endsAt, eaten: {} });
+      connection.on("bug-hunt-started", ({ endsAt, serverNow }) => {
+        clockOffset.current = serverNow - Date.now();
+        setBugHunt({ endsAt: endsAt - clockOffset.current, eaten: {}, bugs: [] });
         setBugHuntResults(null);
+        setHuntClaim(null);
+      }),
+      connection.on("bug-spawn", ({ bug, serverNow }) => {
+        clockOffset.current = serverNow - Date.now();
+        const o = clockOffset.current;
+        const local: HuntBug = {
+          id: bug.id,
+          spawnAt: bug.spawnAt - o,
+          expiresAt: bug.expiresAt - o,
+          path: bug.path.map((p) => ({ ...p, t: p.t - o })),
+        };
+        setBugHunt((prev) => (prev ? { ...prev, bugs: [...prev.bugs, local] } : prev));
+      }),
+      connection.on("bug-claimed", ({ bugId, playerId }) => {
+        setBugHunt((prev) => (prev ? { ...prev, bugs: prev.bugs.filter((b) => b.id !== bugId) } : prev));
+        setHuntClaim({ bugId, playerId, key: Date.now() });
       }),
       connection.on("bug-hunt-scores", ({ eaten }) => {
         setBugHunt((prev) => (prev ? { ...prev, eaten } : prev));
@@ -141,6 +168,7 @@ export function GameServerProvider({
     blinkBreaks,
     lastLifeLost,
     bugHunt,
+    huntClaim,
     bugHuntResults,
     snapshots,
     reel,
@@ -153,7 +181,7 @@ export function GameServerProvider({
     earnPowerup: () => connectionRef.current?.earnPowerup(),
     usePowerup: () => connectionRef.current?.usePowerup(),
     startBugHunt: () => connectionRef.current?.startBugHunt(),
-    bugEaten: () => connectionRef.current?.bugEaten(),
+    claimBug: (bugId) => connectionRef.current?.claimBug(bugId),
     sendSnapshot: (image) => connectionRef.current?.sendSnapshot(image),
   };
 

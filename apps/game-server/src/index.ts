@@ -26,7 +26,7 @@ interface Room {
   powerups: Map<string, number>;
   blinkBreakUntil: Map<string, number>;
   roundTimer: NodeJS.Timeout | null;
-  bugHunt: { endsAt: number; eaten: Map<string, number>; timer: NodeJS.Timeout } | null;
+  bugHunt: BugHunt | null;
   snapshotCount: Map<string, number>;
   lastSnapshotAt: Map<string, number>;
 }
@@ -133,14 +133,78 @@ function loseLife(room: Room, playerId: string, reason: "eye-closed" | "eyes-mis
 }
 
 const BUG_HUNT_MS = 60000;
-const SNAPSHOT_MAX_PER_ROUND = 8;
-const SNAPSHOT_MIN_GAP_MS = 1500;
-const SNAPSHOT_MAX_CHARS = 80000;
+const HUNT_BUG_LIFETIME_MS = 4000;
+const HUNT_BUG_PATH_STEP_MS = 250;
+const HUNT_SPAWN_MIN_MS = 1200;
+const HUNT_SPAWN_MAX_MS = 2400;
+const SNAPSHOT_MAX_PER_ROUND = 20;
+const SNAPSHOT_MIN_GAP_MS = 1000;
+const SNAPSHOT_MAX_CHARS = 250000;
+
+interface PathPoint {
+  t: number;
+  x: number;
+  y: number;
+}
+
+interface HuntBug {
+  id: number;
+  spawnAt: number;
+  expiresAt: number;
+  path: PathPoint[];
+  claimed: boolean;
+}
+
+interface BugHunt {
+  endsAt: number;
+  eaten: Map<string, number>;
+  bugs: Map<number, HuntBug>;
+  nextBugId: number;
+  spawnTimer: NodeJS.Timeout | null;
+  endTimer: NodeJS.Timeout;
+}
+
+const rand = (min: number, max: number) => min + Math.random() * (max - min);
+const clamp01 = (v: number) => Math.min(0.95, Math.max(0.05, v));
+
+// A darting path in tile-normalized (0–1) coordinates, generated once here so
+// every client plays the same bug in the same place at the same time.
+function makeBugPath(spawnAt: number): PathPoint[] {
+  const points: PathPoint[] = [];
+  let x = rand(0.1, 0.9);
+  let y = rand(0.1, 0.9);
+  for (let t = 0; t <= HUNT_BUG_LIFETIME_MS; t += HUNT_BUG_PATH_STEP_MS) {
+    points.push({ t: spawnAt + t, x, y });
+    x = clamp01(x + rand(-0.3, 0.3));
+    y = clamp01(y + rand(-0.3, 0.3));
+  }
+  return points;
+}
+
+function spawnHuntBug(room: Room) {
+  const hunt = room.bugHunt;
+  if (!hunt) return;
+  const now = Date.now();
+  for (const [id, bug] of hunt.bugs) if (bug.expiresAt <= now) hunt.bugs.delete(id);
+  const spawnAt = now;
+  const bug: HuntBug = {
+    id: hunt.nextBugId++,
+    spawnAt,
+    expiresAt: spawnAt + HUNT_BUG_LIFETIME_MS,
+    path: makeBugPath(spawnAt),
+    claimed: false,
+  };
+  hunt.bugs.set(bug.id, bug);
+  broadcast(room, { type: "bug-spawn", bug, serverNow: now });
+  hunt.spawnTimer = setTimeout(() => spawnHuntBug(room), rand(HUNT_SPAWN_MIN_MS, HUNT_SPAWN_MAX_MS));
+}
 
 function endBugHunt(room: Room) {
-  if (!room.bugHunt) return;
-  clearTimeout(room.bugHunt.timer);
-  const results = [...room.bugHunt.eaten].map(([playerId, eaten]) => ({ playerId, eaten }));
+  const hunt = room.bugHunt;
+  if (!hunt) return;
+  clearTimeout(hunt.endTimer);
+  if (hunt.spawnTimer) clearTimeout(hunt.spawnTimer);
+  const results = [...hunt.eaten].map(([playerId, eaten]) => ({ playerId, eaten }));
   room.bugHunt = null;
   broadcast(room, { type: "bug-hunt-over", results });
   broadcastLobby(room);
@@ -327,17 +391,27 @@ wss.on("connection", (socket) => {
         room.bugHunt = {
           endsAt,
           eaten: new Map(),
-          timer: setTimeout(() => endBugHunt(room), BUG_HUNT_MS),
+          bugs: new Map(),
+          nextBugId: 1,
+          spawnTimer: null,
+          endTimer: setTimeout(() => endBugHunt(room), BUG_HUNT_MS),
         };
-        broadcast(room, { type: "bug-hunt-started", endsAt });
+        broadcast(room, { type: "bug-hunt-started", endsAt, serverNow: Date.now() });
         broadcastLobby(room);
+        spawnHuntBug(room);
         break;
       }
 
-      case "bug-eaten": {
+      // First claim to reach the server wins the bug; arrival order is the tiebreak.
+      case "bug-claim": {
         const room = joinedRoom;
         if (!room || !playerId || !room.bugHunt) return;
+        const bug = room.bugHunt.bugs.get(Number(message.bugId));
+        if (!bug || bug.claimed || Date.now() > bug.expiresAt) return;
+        bug.claimed = true;
+        room.bugHunt.bugs.delete(bug.id);
         room.bugHunt.eaten.set(playerId, (room.bugHunt.eaten.get(playerId) ?? 0) + 1);
+        broadcast(room, { type: "bug-claimed", bugId: bug.id, playerId });
         broadcast(room, {
           type: "bug-hunt-scores",
           eaten: Object.fromEntries(room.bugHunt.eaten),
@@ -378,7 +452,10 @@ wss.on("connection", (socket) => {
       }
       room.players.delete(playerId);
       if (room.players.size === 0) {
-        if (room.bugHunt) clearTimeout(room.bugHunt.timer);
+        if (room.bugHunt) {
+          clearTimeout(room.bugHunt.endTimer);
+          if (room.bugHunt.spawnTimer) clearTimeout(room.bugHunt.spawnTimer);
+        }
         if (room.roundTimer) clearTimeout(room.roundTimer);
         rooms.delete(room.id);
       } else {

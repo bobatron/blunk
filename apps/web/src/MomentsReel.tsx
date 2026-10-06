@@ -3,37 +3,27 @@ import { useGameServer } from "./game-server/useGameServer";
 
 const FRAME_MS = 1200;
 
-type Reel = NonNullable<ReturnType<typeof useGameServer>["reel"]>;
-
 /**
- * End-of-round slideshow of the face snapshots taken when players opened
- * their mouths near a bug. Plays once, then clears.
+ * The face snapshots taken when players opened their mouths during the last
+ * round, looping in the lobby until the next round starts.
  */
 export function MomentsReel() {
-  const { reel } = useGameServer();
-  if (!reel) return null;
-  return <Slideshow key={reel.key} reel={reel} />;
-}
-
-function Slideshow({ reel }: { reel: Reel }) {
-  const { dismissReel, playerNames } = useGameServer();
+  const { reel, playerNames } = useGameServer();
+  const count = reel?.items.length ?? 0;
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
-    const id = setInterval(() => setIndex((i) => i + 1), FRAME_MS);
+    if (count === 0) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % count), FRAME_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [count]);
 
-  useEffect(() => {
-    if (index >= reel.items.length) dismissReel();
-  }, [index, reel.items.length, dismissReel]);
-
-  const item = reel.items[index];
+  const item = reel && count > 0 ? reel.items[index % count] : null;
   if (!item) return null;
 
   return (
-    <div className="moments-reel" role="status">
-      <h2>Mouth moments</h2>
+    <div className="moments-reel">
+      <h3>Mouth moments</h3>
       <img src={item.image} alt="" />
       <p>{playerNames[item.playerId] ?? "?"}</p>
     </div>

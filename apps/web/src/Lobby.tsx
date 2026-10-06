@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
 import { Scoreboard } from "./Scoreboard";
 import { playJoin, playWinnerFanfare } from "./sounds";
+import { MomentsReel } from "./MomentsReel";
 
 const LIVES_CHOICES = [1, 2, 3, 5];
 const TIME_CHOICES: { label: string; value: number | null }[] = [
@@ -137,6 +138,7 @@ export function Lobby() {
           </>
         )}
       </div>
+      <MomentsReel />
       <div className="lobby-players">
         <h3>Players ({players.length})</h3>
         <ul>
