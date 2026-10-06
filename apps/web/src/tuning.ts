@@ -14,7 +14,7 @@ export interface Tuning {
   eyesMissingMs: number;
   mouthOn: number;
   mouthOff: number;
-  tongueOn: number;
+  puckerOn: number;
   glassesWidth: number;
   glassesCoverSlack: number;
   glassesFirstMinMs: number;
@@ -44,7 +44,7 @@ export const DEFAULT_TUNING: Tuning = {
   eyesMissingMs: 3000,
   mouthOn: 0.25,
   mouthOff: 0.15,
-  tongueOn: 0.5,
+  puckerOn: 0.5,
   glassesWidth: 0.2,
   glassesCoverSlack: 0.7,
   glassesFirstMinMs: 10000,

@@ -26,8 +26,8 @@ export interface FaceSignalsEvents {
   eyePositions: (payload: { left: { x: number; y: number }; right: { x: number; y: number } }) => void;
   /** Every blendshape this frame, by name, for diagnosing detection. */
   blendshapes: (payload: Record<string, number>) => void;
-  /** Tongue sticks out (rising edge). */
-  tongueOut: () => void;
+  /** Lips pucker (rising edge). */
+  pucker: () => void;
   /** Normalized (0–1) position of the centre of the mouth, in the video frame. */
   mouthPosition: (payload: { x: number; y: number }) => void;
   /** Face has been undetected for the warning delay (tuning: eyesWarningMs). */
@@ -41,7 +41,7 @@ export interface FaceSignalsEvents {
     eyeBlinkRight: number;
     jawOpen: number;
     browOuterUp: number;
-    tongueOut: number;
+    pucker: number;
   }) => void;
 }
 
@@ -80,7 +80,7 @@ export class FaceSignalsDetector {
   private rightWinkFrames = 0;
   private lastFaceAt = 0;
   private eyesWarned = false;
-  private tongueOutState = false;
+  private puckerState = false;
   private video: HTMLVideoElement;
 
   constructor(video: HTMLVideoElement) {
@@ -180,7 +180,7 @@ export class FaceSignalsDetector {
     const jawOpen = get("jawOpen");
     const browOuterUp = (get("browOuterUpLeft") + get("browOuterUpRight")) / 2;
 
-    this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp, tongueOut: get("tongueOut") });
+    this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp, pucker: get("mouthPucker") });
     const all: Record<string, number> = {};
     for (const c of categories) all[c.categoryName] = c.score;
     this.emit("blendshapes", all);
@@ -212,13 +212,13 @@ export class FaceSignalsDetector {
     if (this.leftWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "left" });
     if (this.rightWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "right" });
 
-    // Tongue out: rising edge, with hysteresis so it doesn't flicker.
-    const tongue = get("tongueOut");
-    if (tongue > t.tongueOn && !this.tongueOutState) {
-      this.tongueOutState = true;
-      this.emit("tongueOut");
-    } else if (tongue < t.tongueOn * 0.6) {
-      this.tongueOutState = false;
+    // Pucker: rising edge, with hysteresis so it doesn't flicker.
+    const pucker = get("mouthPucker");
+    if (pucker > t.puckerOn && !this.puckerState) {
+      this.puckerState = true;
+      this.emit("pucker");
+    } else if (pucker < t.puckerOn * 0.6) {
+      this.puckerState = false;
     }
 
     // Mouth open/closed.

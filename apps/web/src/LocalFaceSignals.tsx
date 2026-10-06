@@ -53,7 +53,7 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
         if (maskRef.current) gameRef.current.sendMaskedBlink();
         else gameRef.current.sendBlunk();
       }),
-      d.on("tongueOut", () => {
+      d.on("pucker", () => {
         const g = gameRef.current;
         const me = g.players.find((p) => p.id === g.playerId);
         if (g.roundActive && (me?.lives ?? 0) > 0 && (me?.powerups ?? 0) > 0) g.usePowerup();
