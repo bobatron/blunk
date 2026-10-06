@@ -22,7 +22,7 @@ interface Glasses extends GlassesPos {
  * store, separately from the bugs.
  */
 export function Sunglasses() {
-  const { detector, videoRef, maskRef } = useLocalFace();
+  const { detector, videoRef, maskRef, photoRef } = useLocalFace();
   const { roundActive, playerId, players } = useGameServer();
   const me = players.find((p) => p.id === playerId);
   const alive = roundActive && (me?.lives ?? 0) > 0;
@@ -30,6 +30,7 @@ export function Sunglasses() {
   const layerRef = useRef<HTMLDivElement>(null);
   const [sprite, setSprite] = useState<{ left: number; top: number; size: number } | null>(null);
   const glassesRef = useRef<Glasses | null>(null);
+  const photosSeen = useRef(0);
 
   // Keep the mask flag in step with the eyes and the current glasses.
   useEffect(() => {
@@ -74,6 +75,12 @@ export function Sunglasses() {
     const id = setInterval(() => {
       const now = Date.now();
       const t = getTuning();
+      if (photoRef.current !== photosSeen.current) {
+        // A photo was taken with these glasses: take them off until the next appearance.
+        photosSeen.current = photoRef.current;
+        glassesRef.current = null;
+        maskRef.current = false;
+      }
       let g = glassesRef.current;
       if (g && g.expiresAt <= now) {
         glassesRef.current = null;
@@ -113,7 +120,7 @@ export function Sunglasses() {
       setSprite({ left: center.x, top: center.y, size: t.glassesWidth * video.videoWidth * scale });
     }, TICK_MS);
     return () => clearInterval(id);
-  }, [alive, maskRef, videoRef]);
+  }, [alive, maskRef, videoRef, photoRef]);
 
   return (
     <div ref={layerRef} className="sunglasses-layer">

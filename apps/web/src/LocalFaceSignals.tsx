@@ -20,6 +20,7 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
   const [detector, setDetector] = useState<FaceSignalsDetector | null>(null);
   const [eyesWarning, setEyesWarning] = useState(false);
   const maskRef = useRef(false);
+  const photoRef = useRef(0);
   const game = useGameServer();
 
   // Latest game state for detector callbacks, which are registered once.
@@ -50,8 +51,14 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
       d.on("eyeClosed", () => {
         if (isOut()) return;
         // Eyes behind sunglasses are a photo, not a blink.
-        if (maskRef.current) gameRef.current.sendMaskedBlink();
-        else gameRef.current.sendBlunk();
+        if (maskRef.current) {
+          // One photo per pair of glasses: they come off once used.
+          photoRef.current += 1;
+          maskRef.current = false;
+          gameRef.current.sendMaskedBlink();
+        } else {
+          gameRef.current.sendBlunk();
+        }
       }),
       d.on("pucker", () => {
         const g = gameRef.current;
@@ -82,7 +89,7 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <LocalFaceContext.Provider value={{ detector, videoRef, maskRef }}>
+    <LocalFaceContext.Provider value={{ detector, videoRef, maskRef, photoRef }}>
       <video ref={videoRef} muted playsInline style={{ display: "none" }} />
       {children}
       {eyesWarning && game.roundActive && (
