@@ -38,13 +38,14 @@ export function ConferenceRoom({
       className="room-layout"
     >
       <GameServerProvider roomName={roomName} participantName={participantName}>
-        <LocalFaceSignals />
-        <div className="room-header">
-          <Lobby />
-          <StaringContest />
-        </div>
-        <GameGrid />
-        <ControlBar />
+        <LocalFaceSignals>
+          <div className="room-header">
+            <Lobby />
+            <StaringContest />
+          </div>
+          <GameGrid />
+          <ControlBar />
+        </LocalFaceSignals>
         <RoomAudioRenderer />
       </GameServerProvider>
     </LiveKitRoom>

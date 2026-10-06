@@ -1,8 +1,27 @@
+export interface RoomConfig {
+  lives: number;
+  /** null = no time limit */
+  timeLimitSec: number | null;
+}
+
+export interface LobbyPlayer {
+  id: string;
+  name: string;
+  lives: number;
+  powerups: number;
+}
+
 export interface GameServerEvents {
   joined: (payload: { playerId: string; roomId: string }) => void;
-  "lobby-state": (payload: { players: { id: string; name: string }[]; roundActive: boolean }) => void;
-  "round-started": () => void;
+  "lobby-state": (payload: { players: LobbyPlayer[]; roundActive: boolean; config: RoomConfig }) => void;
+  "round-started": (payload: { endsAt: number | null; lives: number }) => void;
+  "life-lost": (payload: {
+    playerId: string;
+    livesLeft: number;
+    reason: "eye-closed" | "eyes-missing";
+  }) => void;
   "player-eliminated": (payload: { playerId: string; serverTimestamp: number; place: number }) => void;
+  "blink-break": (payload: { playerId: string; until: number }) => void;
   "round-over": (payload: { winnerId: string | null }) => void;
   error: (payload: { message: string }) => void;
 }
@@ -16,7 +35,7 @@ function toWsUrl(httpUrl: string): string {
 
 /**
  * Thin wrapper around the game-server's WebSocket protocol (room join,
- * round lifecycle, elimination events). Every mini-game that needs shared
+ * round lifecycle, lives, power-ups). Every mini-game that needs shared
  * game state should go through this rather than opening its own socket.
  */
 export class GameServerConnection {
@@ -48,12 +67,36 @@ export class GameServerConnection {
     return () => this.listeners.get(event)?.delete(handler as (...args: never[]) => void);
   }
 
-  startRound(): void {
-    this.socket.send(JSON.stringify({ type: "start-round" }));
+  private send(message: unknown) {
+    if (this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify(message));
+    }
   }
 
-  sendBlunk(): void {
-    this.socket.send(JSON.stringify({ type: "blunk" }));
+  startRound(): void {
+    this.send({ type: "start-round" });
+  }
+
+  setConfig(config: RoomConfig): void {
+    this.send({ type: "set-config", ...config });
+  }
+
+  /** Either eye closed during a round. */
+  sendEyeClosed(): void {
+    this.send({ type: "blunk" });
+  }
+
+  /** Face not visible for long enough to count as a life lost. */
+  sendEyesMissing(): void {
+    this.send({ type: "eyes-missing" });
+  }
+
+  earnPowerup(): void {
+    this.send({ type: "earn-powerup" });
+  }
+
+  usePowerup(): void {
+    this.send({ type: "use-powerup" });
   }
 
   close(): void {

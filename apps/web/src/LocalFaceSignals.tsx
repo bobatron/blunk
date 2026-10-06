@@ -1,21 +1,30 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocalParticipant } from "@livekit/components-react";
-import { useFaceSignals } from "./face-signals/useFaceSignals";
+import { FaceSignalsDetector } from "./face-signals/FaceSignalsDetector";
 import { useGameServer } from "./game-server/useGameServer";
+import { LocalFaceContext } from "./localFace";
 
 /**
- * Runs blink detection against the local participant's own camera feed
- * (piped from LiveKit's local video track into a hidden <video>, since the
- * prebuilt VideoConference UI doesn't expose the raw element) and reports
- * eye closures to the game-server while a round is active. Uses the
- * `eyeClosed` signal (either eye, not just a synchronized two-eye blink) so
- * winking one eye at a time can't be used to dodge detection. Renders
- * nothing.
+ * Runs face detection on the local participant's own camera feed and reports
+ * to the game server: eye closures (a life lost on blink) and eyes not visible
+ * for too long (a life lost, with a warning first). Exposes the detector to
+ * children (e.g. power-ups) via context.
+ *
+ * Camera feed comes from LiveKit's local video track, piped into a hidden
+ * <video> since the grid tiles don't expose the raw element.
  */
-export function LocalFaceSignals() {
+export function LocalFaceSignals({ children }: { children: ReactNode }) {
   const { cameraTrack } = useLocalParticipant();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { playerId, roundActive, eliminations, sendBlunk } = useGameServer();
+  const [detector, setDetector] = useState<FaceSignalsDetector | null>(null);
+  const [eyesWarning, setEyesWarning] = useState(false);
+  const game = useGameServer();
+
+  // Latest game state for detector callbacks, which are registered once.
+  const gameRef = useRef(game);
+  useEffect(() => {
+    gameRef.current = game;
+  });
 
   useEffect(() => {
     const track = cameraTrack?.track;
@@ -27,14 +36,42 @@ export function LocalFaceSignals() {
     };
   }, [cameraTrack]);
 
-  const isEliminated = eliminations.some((e) => e.playerId === playerId);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const d = new FaceSignalsDetector(video);
+    const isOut = () => {
+      const g = gameRef.current;
+      return !g.roundActive || !(g.players.find((p) => p.id === g.playerId)?.lives ?? 0);
+    };
+    const offs = [
+      d.on("eyeClosed", () => {
+        if (!isOut()) gameRef.current.sendBlunk();
+      }),
+      d.on("eyesWarning", () => setEyesWarning(true)),
+      d.on("eyesFound", () => setEyesWarning(false)),
+      d.on("eyesMissing", () => {
+        if (!isOut()) gameRef.current.sendEyesMissing();
+      }),
+    ];
+    d.start()
+      .then(() => setDetector(d))
+      .catch(() => setEyesWarning(false));
+    return () => {
+      offs.forEach((off) => off());
+      d.stop();
+    };
+  }, []);
 
-  const handleEyeClosed = useCallback(() => {
-    if (roundActive && !isEliminated) sendBlunk();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roundActive, isEliminated]);
-
-  useFaceSignals(videoRef, { eyeClosed: handleEyeClosed });
-
-  return <video ref={videoRef} muted playsInline style={{ display: "none" }} />;
+  return (
+    <LocalFaceContext.Provider value={{ detector, videoRef }}>
+      <video ref={videoRef} muted playsInline style={{ display: "none" }} />
+      {children}
+      {eyesWarning && game.roundActive && (
+        <div className="eyes-warning" role="alert">
+          Eyes not detected! Show your eyes or you'll lose a life.
+        </div>
+      )}
+    </LocalFaceContext.Provider>
+  );
 }

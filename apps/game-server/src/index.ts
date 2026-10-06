@@ -9,28 +9,56 @@ interface Player {
   socket: WebSocket;
 }
 
+interface Config {
+  lives: number;
+  /** null = no time limit */
+  timeLimitSec: number | null;
+}
+
 interface Room {
   id: string;
   players: Map<string, Player>;
-  eliminationOrder: string[];
   roundActive: boolean;
+  config: Config;
+  /** Lives per player for the current round. Only players in this map are in the round. */
+  lives: Map<string, number>;
+  eliminationOrder: string[];
+  powerups: Map<string, number>;
+  blinkBreakUntil: Map<string, number>;
+  roundTimer: NodeJS.Timeout | null;
 }
+
+const DEFAULT_CONFIG: Config = { lives: 3, timeLimitSec: 90 };
+const BLINK_BREAK_MS = 5000;
+const MAX_POWERUPS = 3;
+const LIVES_OPTIONS = [1, 2, 3, 5];
+const TIME_OPTIONS: (number | null)[] = [30, 60, 90, 120, null];
 
 const rooms = new Map<string, Room>();
 
 function getOrCreateRoom(roomId: string): Room {
   let room = rooms.get(roomId);
   if (!room) {
-    room = { id: roomId, players: new Map(), eliminationOrder: [], roundActive: false };
+    room = {
+      id: roomId,
+      players: new Map(),
+      roundActive: false,
+      config: { ...DEFAULT_CONFIG },
+      lives: new Map(),
+      eliminationOrder: [],
+      powerups: new Map(),
+      blinkBreakUntil: new Map(),
+      roundTimer: null,
+    };
     rooms.set(roomId, room);
   }
   return room;
 }
 
-function broadcast(room: Room, message: unknown, exceptId?: string) {
+function broadcast(room: Room, message: unknown) {
   const payload = JSON.stringify(message);
   for (const player of room.players.values()) {
-    if (player.id !== exceptId && player.socket.readyState === player.socket.OPEN) {
+    if (player.socket.readyState === player.socket.OPEN) {
       player.socket.send(payload);
     }
   }
@@ -39,17 +67,40 @@ function broadcast(room: Room, message: unknown, exceptId?: string) {
 function lobbyState(room: Room) {
   return {
     type: "lobby-state",
-    players: [...room.players.values()].map((p) => ({ id: p.id, name: p.name })),
+    players: [...room.players.values()].map((p) => ({
+      id: p.id,
+      name: p.name,
+      lives: room.roundActive ? (room.lives.get(p.id) ?? 0) : room.config.lives,
+      powerups: room.powerups.get(p.id) ?? 0,
+    })),
     roundActive: room.roundActive,
+    config: room.config,
   };
 }
 
-// Recorded with a server timestamp so near-simultaneous blinks resolve
-// fairly instead of trusting client-reported order. Also used when a
-// player disconnects mid-round, so the round can still complete.
-function eliminate(room: Room, playerId: string) {
+function broadcastLobby(room: Room) {
+  broadcast(room, lobbyState(room));
+}
+
+function endRound(room: Room, winnerId: string | null) {
+  room.roundActive = false;
+  if (room.roundTimer) clearTimeout(room.roundTimer);
+  room.roundTimer = null;
+  broadcast(room, { type: "round-over", winnerId });
+  broadcastLobby(room);
+}
+
+function aliveIds(room: Room): string[] {
+  return [...room.lives].filter(([, lives]) => lives > 0).map(([id]) => id);
+}
+
+function checkRoundEnd(room: Room) {
   if (!room.roundActive) return;
-  if (room.eliminationOrder.includes(playerId)) return;
+  const alive = aliveIds(room);
+  if (alive.length <= 1) endRound(room, alive[0] ?? null);
+}
+
+function eliminate(room: Room, playerId: string) {
   room.eliminationOrder.push(playerId);
   broadcast(room, {
     type: "player-eliminated",
@@ -57,12 +108,31 @@ function eliminate(room: Room, playerId: string) {
     serverTimestamp: Date.now(),
     place: room.eliminationOrder.length,
   });
+}
 
-  const remaining = [...room.players.keys()].filter((id) => !room.eliminationOrder.includes(id));
-  if (remaining.length <= 1) {
-    room.roundActive = false;
-    broadcast(room, { type: "round-over", winnerId: remaining[0] ?? null });
-  }
+// Every life lost — blink or eyes-not-visible — goes through here, so the
+// server is the only thing deciding who's still in. Blink-break ignores it.
+function loseLife(room: Room, playerId: string, reason: "eye-closed" | "eyes-missing") {
+  if (!room.roundActive) return;
+  const current = room.lives.get(playerId);
+  if (!current || current <= 0) return;
+  if ((room.blinkBreakUntil.get(playerId) ?? 0) > Date.now()) return;
+
+  const livesLeft = current - 1;
+  room.lives.set(playerId, livesLeft);
+  broadcast(room, { type: "life-lost", playerId, livesLeft, reason });
+  if (livesLeft === 0) eliminate(room, playerId);
+  checkRoundEnd(room);
+  broadcastLobby(room);
+}
+
+function endByTime(room: Room) {
+  if (!room.roundActive) return;
+  const alive = [...room.lives].filter(([, lives]) => lives > 0);
+  const best = Math.max(0, ...alive.map(([, lives]) => lives));
+  const top = alive.filter(([, lives]) => lives === best);
+  // A tie on lives at the buzzer is a draw, not a winner.
+  endRound(room, top.length === 1 ? top[0][0] : null);
 }
 
 // --- LiveKit access tokens -------------------------------------------------
@@ -152,25 +222,73 @@ wss.on("connection", (socket) => {
         joinedRoom = room;
         room.players.set(playerId, { id: playerId, name: message.name ?? "Player", socket });
         socket.send(JSON.stringify({ type: "joined", playerId, roomId: room.id }));
-        broadcast(room, lobbyState(room));
+        broadcastLobby(room);
+        break;
+      }
+
+      case "set-config": {
+        if (!joinedRoom || joinedRoom.roundActive) return;
+        const lives = Number(message.lives);
+        const timeLimitSec = message.timeLimitSec === null ? null : Number(message.timeLimitSec);
+        if (!LIVES_OPTIONS.includes(lives)) return;
+        if (!TIME_OPTIONS.includes(timeLimitSec)) return;
+        joinedRoom.config = { lives, timeLimitSec };
+        broadcastLobby(joinedRoom);
         break;
       }
 
       case "start-round": {
-        if (!joinedRoom) return;
+        if (!joinedRoom || joinedRoom.roundActive) return;
         if (joinedRoom.players.size < 2) {
           socket.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
           return;
         }
-        joinedRoom.roundActive = true;
-        joinedRoom.eliminationOrder = [];
-        broadcast(joinedRoom, { type: "round-started" });
+        const room = joinedRoom;
+        room.roundActive = true;
+        room.eliminationOrder = [];
+        room.powerups = new Map();
+        room.blinkBreakUntil = new Map();
+        room.lives = new Map([...room.players.keys()].map((id) => [id, room.config.lives]));
+        const { timeLimitSec } = room.config;
+        const endsAt = timeLimitSec ? Date.now() + timeLimitSec * 1000 : null;
+        broadcast(room, { type: "round-started", endsAt, lives: room.config.lives });
+        if (timeLimitSec) room.roundTimer = setTimeout(() => endByTime(room), timeLimitSec * 1000);
+        broadcastLobby(room);
         break;
       }
 
+      // Eye closure (either eye) from the client's face detection.
       case "blunk": {
         if (!joinedRoom || !playerId) return;
-        eliminate(joinedRoom, playerId);
+        loseLife(joinedRoom, playerId, "eye-closed");
+        break;
+      }
+
+      case "eyes-missing": {
+        if (!joinedRoom || !playerId) return;
+        loseLife(joinedRoom, playerId, "eyes-missing");
+        break;
+      }
+
+      case "earn-powerup": {
+        if (!joinedRoom || !playerId || !joinedRoom.roundActive) return;
+        if (!(joinedRoom.lives.get(playerId) ?? 0)) return;
+        const count = joinedRoom.powerups.get(playerId) ?? 0;
+        if (count < MAX_POWERUPS) joinedRoom.powerups.set(playerId, count + 1);
+        broadcastLobby(joinedRoom);
+        break;
+      }
+
+      case "use-powerup": {
+        if (!joinedRoom || !playerId || !joinedRoom.roundActive) return;
+        const room = joinedRoom;
+        const count = room.powerups.get(playerId) ?? 0;
+        if (count <= 0 || !(room.lives.get(playerId) ?? 0)) return;
+        room.powerups.set(playerId, count - 1);
+        const until = Date.now() + BLINK_BREAK_MS;
+        room.blinkBreakUntil.set(playerId, until);
+        broadcast(room, { type: "blink-break", playerId, until });
+        broadcastLobby(room);
         break;
       }
 
@@ -181,11 +299,19 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     if (joinedRoom && playerId) {
-      if (joinedRoom.roundActive) eliminate(joinedRoom, playerId);
-      joinedRoom.players.delete(playerId);
-      broadcast(joinedRoom, lobbyState(joinedRoom));
-      if (joinedRoom.players.size === 0) {
-        rooms.delete(joinedRoom.id);
+      const room = joinedRoom;
+      // A player who drops mid-round is knocked out so the round can still end.
+      if (room.roundActive && (room.lives.get(playerId) ?? 0) > 0) {
+        room.lives.set(playerId, 0);
+        eliminate(room, playerId);
+      }
+      room.players.delete(playerId);
+      if (room.players.size === 0) {
+        if (room.roundTimer) clearTimeout(room.roundTimer);
+        rooms.delete(room.id);
+      } else {
+        checkRoundEnd(room);
+        broadcastLobby(room);
       }
     }
   });

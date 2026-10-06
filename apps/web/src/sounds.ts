@@ -45,6 +45,11 @@ export function playBlunk() {
   tone(80, { startFrequency: 300, duration: 0.4, type: "sawtooth", gain: 0.3 });
 }
 
+/** Losing a life but not yet out — a short descending "oof". */
+export function playLifeLost() {
+  tone(330, { startFrequency: 520, duration: 0.25, type: "triangle", gain: 0.25 });
+}
+
 /** A new player joining the lobby. */
 export function playJoin() {
   tone(660, { duration: 0.1, type: "triangle", gain: 0.15 });

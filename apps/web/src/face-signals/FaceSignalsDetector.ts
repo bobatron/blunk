@@ -18,6 +18,10 @@ const EYEBROW_OFF = 0.2;
  * doesn't get misread as a wink. */
 const WINK_DEBOUNCE_FRAMES = 3;
 
+/** How long a face can go undetected before we warn, and before it costs a life. */
+export const EYES_WARNING_MS = 1000;
+export const EYES_MISSING_MS = 3000;
+
 export interface FaceSignalsEvents {
   /** Both eyes closed together. */
   blink: () => void;
@@ -29,6 +33,14 @@ export interface FaceSignalsEvents {
   mouthOpen: () => void;
   mouthClosed: () => void;
   eyebrowRaise: () => void;
+  /** Normalized (0–1) position of the centre of the mouth, in the video frame. */
+  mouthPosition: (payload: { x: number; y: number }) => void;
+  /** Face has been undetected for EYES_WARNING_MS. */
+  eyesWarning: () => void;
+  /** Face is detected again after a warning. */
+  eyesFound: () => void;
+  /** Face has been undetected for EYES_MISSING_MS — fires every EYES_MISSING_MS while it lasts. */
+  eyesMissing: () => void;
   scores: (payload: {
     eyeBlinkLeft: number;
     eyeBlinkRight: number;
@@ -38,6 +50,10 @@ export interface FaceSignalsEvents {
 }
 
 type EventName = keyof FaceSignalsEvents;
+
+// Inner lip landmarks in MediaPipe's 478-point face mesh.
+const UPPER_INNER_LIP = 13;
+const LOWER_INNER_LIP = 14;
 
 let sharedVisionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
 
@@ -50,9 +66,9 @@ function getVisionFileset() {
 
 /**
  * Wraps MediaPipe's Face Landmarker to emit discrete face-signal events
- * (blink, wink, mouth open/closed, eyebrow raise) from a live <video>
- * element. Every mini-game that needs face input should consume this
- * rather than talking to MediaPipe directly.
+ * (blink, wink, mouth open/closed, eyebrow raise, eyes-not-visible) from a
+ * live <video> element. Every mini-game that needs face input should consume
+ * this rather than talking to MediaPipe directly.
  */
 export class FaceSignalsDetector {
   private landmarker: FaceLandmarker | null = null;
@@ -64,6 +80,8 @@ export class FaceSignalsDetector {
   private eyebrowRaisedState = false;
   private leftWinkFrames = 0;
   private rightWinkFrames = 0;
+  private lastFaceAt = 0;
+  private eyesWarned = false;
   private video: HTMLVideoElement;
 
   constructor(video: HTMLVideoElement) {
@@ -94,6 +112,7 @@ export class FaceSignalsDetector {
       runningMode: "VIDEO",
       numFaces: 1,
     });
+    this.lastFaceAt = performance.now();
     this.loop();
   }
 
@@ -111,15 +130,41 @@ export class FaceSignalsDetector {
     // skip rather than let one bad frame kill the whole detection loop.
     if (this.video.readyState >= this.video.HAVE_CURRENT_DATA) {
       try {
-        const result = this.landmarker.detectForVideo(this.video, performance.now());
+        const now = performance.now();
+        const result = this.landmarker.detectForVideo(this.video, now);
         const categories = result.faceBlendshapes[0]?.categories;
+        const landmarks = result.faceLandmarks[0];
+        this.updatePresence(Boolean(categories), now);
         if (categories) this.processCategories(categories);
+        if (landmarks) {
+          const upper = landmarks[UPPER_INNER_LIP];
+          const lower = landmarks[LOWER_INNER_LIP];
+          this.emit("mouthPosition", { x: (upper.x + lower.x) / 2, y: (upper.y + lower.y) / 2 });
+        }
       } catch {
         // transient — try again next frame
       }
     }
     this.rafId = requestAnimationFrame(this.loop);
   };
+
+  private updatePresence(present: boolean, now: number) {
+    if (present) {
+      if (this.eyesWarned) this.emit("eyesFound");
+      this.eyesWarned = false;
+      this.lastFaceAt = now;
+      return;
+    }
+    const missingMs = now - this.lastFaceAt;
+    if (!this.eyesWarned && missingMs >= EYES_WARNING_MS) {
+      this.eyesWarned = true;
+      this.emit("eyesWarning");
+    }
+    if (missingMs >= EYES_MISSING_MS) {
+      this.lastFaceAt = now;
+      this.emit("eyesMissing");
+    }
+  }
 
   private processCategories(categories: { categoryName: string; score: number }[]) {
     const get = (name: string) => categories.find((c) => c.categoryName === name)?.score ?? 0;

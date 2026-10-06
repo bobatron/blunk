@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
-import { playBlunk, playRoundStart } from "./sounds";
+import { playBlunk, playLifeLost, playRoundStart } from "./sounds";
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
 
 /**
- * The in-round Staring Contest HUD: live status while a round is active,
- * and the "BLUNK!" reveal when someone's eliminated. Pre/post-round UI
- * (start button, winner, scoreboard) lives in Lobby instead.
+ * The in-round HUD: countdown, live status, a sound and message when a life
+ * is lost, and the big "BLUNK!" reveal when someone's out.
  */
 export function StaringContest() {
-  const { playerId, players, roundActive, eliminations } = useGameServer();
+  const { playerId, players, roundActive, roundEndsAt, eliminations, lastLifeLost } = useGameServer();
   const [flash, setFlash] = useState<{ name: string; key: number } | null>(null);
+  const [lifeToast, setLifeToast] = useState<string | null>(null);
   const wasRoundActive = useRef(false);
+  const now = useNow(250);
 
   useEffect(() => {
     if (roundActive && !wasRoundActive.current) playRoundStart();
@@ -29,18 +39,36 @@ export function StaringContest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eliminations]);
 
-  if (!roundActive && !flash) return null;
+  useEffect(() => {
+    if (!lastLifeLost) return;
+    const name = players.find((p) => p.id === lastLifeLost.playerId)?.name ?? "Someone";
+    // Being knocked out is handled by the BLUNK reveal above, so only a
+    // life lost while still in the round gets this sound and message.
+    if (lastLifeLost.livesLeft > 0) {
+      playLifeLost();
+      const reason = lastLifeLost.reason === "eyes-missing" ? "eyes not visible" : "eyes closed";
+      setLifeToast(`${name} lost a life (${reason}) — ${lastLifeLost.livesLeft} left`);
+      const timer = setTimeout(() => setLifeToast(null), 1800);
+      return () => clearTimeout(timer);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastLifeLost]);
+
+  if (!roundActive && !flash && !lifeToast) return null;
 
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
+  const remainingSec = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
 
   return (
     <div className="staring-contest-hud">
       {roundActive && (
         <p className="round-status">
-          {players.length - eliminations.length} still staring
+          {remainingSec === null ? "∞" : `${remainingSec}s`} · {players.length - eliminations.length}{" "}
+          still in
           {isEliminated && " — you're out, spectate and cheer!"}
         </p>
       )}
+      {lifeToast && <p className="life-toast">{lifeToast}</p>}
       {flash && (
         <div key={flash.key} className="blunk-flash">
           <div className="blunk-stamp">BLUNK!</div>
