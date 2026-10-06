@@ -989,3 +989,15 @@ button {
   color: white;
   background: rgba(0, 0, 0, 0.75);
 }
+
+.tuning-stage {
+  container-type: size;
+}
+
+.sunglasses.preview {
+  opacity: 0.85;
+}
+
+.sunglasses.preview.covering {
+  filter: drop-shadow(0 0 6px #1ff968);
+}

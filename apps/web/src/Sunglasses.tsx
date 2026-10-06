@@ -1,42 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalFace } from "./localFace";
 import { toLayerPx } from "./layerMath";
+import { bothEyesCovered, type GlassesPos } from "./glassesMath";
+import { getTuning } from "./tuning";
 import { useGameServer } from "./game-server/useGameServer";
 
-// Glasses size and eye-cover tolerance, in normalized (0–1) video coordinates.
-const GLASSES_W = 0.36;
-const GLASSES_H = 0.13;
-const COVER_SLACK = 0.9;
-const LIFETIME_MS = 5000;
-const SPEED = 0.25;
 const TICK_MS = 40;
-const FIRST_MIN_MS = 8000;
-const FIRST_MAX_MS = 14000;
-const GAP_MIN_MS = 18000;
-const GAP_MAX_MS = 30000;
+const rand = (min: number, max: number) => min + Math.random() * (max - min);
 
-interface Glasses {
-  x: number;
-  y: number;
+interface Glasses extends GlassesPos {
   angle: number;
   turnAt: number;
   expiresAt: number;
 }
 
-const rand = (min: number, max: number) => min + Math.random() * (max - min);
-
-function covers(eye: { x: number; y: number }, g: Glasses) {
-  return (
-    Math.abs(eye.x - g.x) < (GLASSES_W / 2) * COVER_SLACK &&
-    Math.abs(eye.y - g.y) < (GLASSES_H / 2) * COVER_SLACK
-  );
-}
-
 /**
- * A pair of sunglasses drifts over your face. Holding your eyes behind them
+ * A pair of sunglasses drifts over your face. Holding both eyes behind them
  * and blinking takes a photo: everyone else still in the round loses a life.
  * The masked state is written to maskRef so the blink handler can tell a
- * photo from a normal blink.
+ * photo from a normal blink. Size, speed, and timing come from the tuning
+ * store, separately from the bugs.
  */
 export function Sunglasses() {
   const { detector, videoRef, maskRef } = useLocalFace();
@@ -48,12 +31,12 @@ export function Sunglasses() {
   const [sprite, setSprite] = useState<{ left: number; top: number; size: number } | null>(null);
   const glassesRef = useRef<Glasses | null>(null);
 
-  // Keep the current glasses and eye positions in step, and set the mask flag.
+  // Keep the mask flag in step with the eyes and the current glasses.
   useEffect(() => {
     if (!detector) return;
     const off = detector.on("eyePositions", (eyes) => {
       const g = glassesRef.current;
-      maskRef.current = Boolean(g && covers(eyes.left, g) && covers(eyes.right, g));
+      maskRef.current = Boolean(g && bothEyesCovered(eyes.left, eyes.right, g, getTuning()));
     });
     return () => {
       off();
@@ -69,42 +52,44 @@ export function Sunglasses() {
     }
     let timer: ReturnType<typeof setTimeout>;
     const spawn = () => {
+      const t = getTuning();
       const now = Date.now();
-      const g: Glasses = {
+      glassesRef.current = {
         x: rand(0.25, 0.75),
         y: rand(0.25, 0.75),
         angle: rand(0, Math.PI * 2),
-        turnAt: now + rand(400, 1000),
-        expiresAt: now + LIFETIME_MS,
+        turnAt: now + rand(t.glassesTurnMinMs, Math.max(t.glassesTurnMinMs, t.glassesTurnMaxMs)),
+        expiresAt: now + t.glassesLifetimeMs,
       };
-      glassesRef.current = g;
-      timer = setTimeout(spawn, rand(GAP_MIN_MS, GAP_MAX_MS));
+      timer = setTimeout(spawn, rand(t.glassesGapMinMs, Math.max(t.glassesGapMinMs, t.glassesGapMaxMs)));
     };
-    timer = setTimeout(spawn, rand(FIRST_MIN_MS, FIRST_MAX_MS));
+    const t0 = getTuning();
+    timer = setTimeout(spawn, rand(t0.glassesFirstMinMs, Math.max(t0.glassesFirstMinMs, t0.glassesFirstMaxMs)));
     return () => clearTimeout(timer);
   }, [alive]);
 
-  // Drift the glasses around the face and redraw.
+  // Drift the glasses around the face and place the sprite.
   useEffect(() => {
     if (!alive) return;
     const id = setInterval(() => {
       const now = Date.now();
-      const g = glassesRef.current;
+      const t = getTuning();
+      let g = glassesRef.current;
       if (g && g.expiresAt <= now) {
         glassesRef.current = null;
         maskRef.current = false;
+        g = null;
       }
-      const cur = glassesRef.current;
-      if (cur) {
+      if (g) {
         const dt = TICK_MS / 1000;
-        let angle = cur.angle;
-        let turnAt = cur.turnAt;
+        let angle = g.angle;
+        let turnAt = g.turnAt;
         if (now >= turnAt) {
           angle = rand(0, Math.PI * 2);
-          turnAt = now + rand(400, 1000);
+          turnAt = now + rand(t.glassesTurnMinMs, Math.max(t.glassesTurnMinMs, t.glassesTurnMaxMs));
         }
-        let x = cur.x + Math.cos(angle) * SPEED * dt;
-        let y = cur.y + Math.sin(angle) * SPEED * dt;
+        let x = g.x + Math.cos(angle) * t.glassesSpeed * dt;
+        let y = g.y + Math.sin(angle) * t.glassesSpeed * dt;
         if (x < 0.15 || x > 0.85) {
           angle = Math.PI - angle;
           x = Math.min(Math.max(x, 0.15), 0.85);
@@ -113,19 +98,19 @@ export function Sunglasses() {
           angle = -angle;
           y = Math.min(Math.max(y, 0.2), 0.8);
         }
-        glassesRef.current = { ...cur, x, y, angle, turnAt };
+        g = { ...g, x, y, angle, turnAt };
+        glassesRef.current = g;
       }
       const layer = layerRef.current;
       const video = videoRef.current;
-      const gNow = glassesRef.current;
-      if (!gNow || !layer || !video || !video.videoWidth) {
+      if (!g || !layer || !video || !video.videoWidth) {
         setSprite(null);
         return;
       }
-      const center = toLayerPx(layer, video, gNow.x, gNow.y);
+      const center = toLayerPx(layer, video, g.x, g.y);
       if (!center) return;
       const scale = Math.max(layer.clientWidth / video.videoWidth, layer.clientHeight / video.videoHeight);
-      setSprite({ left: center.x, top: center.y, size: GLASSES_W * video.videoWidth * scale });
+      setSprite({ left: center.x, top: center.y, size: t.glassesWidth * video.videoWidth * scale });
     }, TICK_MS);
     return () => clearInterval(id);
   }, [alive, maskRef, videoRef]);
@@ -140,4 +125,3 @@ export function Sunglasses() {
     </div>
   );
 }
-

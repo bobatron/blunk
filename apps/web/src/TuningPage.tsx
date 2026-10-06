@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_TUNING, resetTuning, setTuning, useTuning, type Tuning } from "./tuning";
 import { useStandaloneFace } from "./useStandaloneFace";
 import { BugField, type Chomp } from "./BugField";
+import { bothEyesCovered } from "./glassesMath";
+import { getTuning } from "./tuning";
 
 interface Slider {
   key: keyof Tuning;
@@ -18,6 +20,27 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
+  {
+    title: "Sunglasses (size)",
+    sliders: [
+      { key: "glassesWidth", label: "Width, fraction of the screen", min: 0.05, max: 0.8, step: 0.01 },
+      { key: "glassesHeight", label: "Height, fraction of the video", min: 0.02, max: 0.5, step: 0.01 },
+      { key: "glassesCoverSlack", label: "Eye-cover tolerance", min: 0.5, max: 1.5, step: 0.05 },
+    ],
+  },
+  {
+    title: "Sunglasses (movement and timing)",
+    sliders: [
+      { key: "glassesSpeed", label: "Speed", min: 0.02, max: 1, step: 0.01 },
+      { key: "glassesTurnMinMs", label: "Changes direction, shortest", min: 100, max: 3000, step: 50, unit: "ms" },
+      { key: "glassesTurnMaxMs", label: "Changes direction, longest", min: 100, max: 5000, step: 50, unit: "ms" },
+      { key: "glassesLifetimeMs", label: "Stays on screen", min: 500, max: 15000, step: 250, unit: "ms" },
+      { key: "glassesFirstMinMs", label: "First appearance, earliest", min: 1000, max: 30000, step: 500, unit: "ms" },
+      { key: "glassesFirstMaxMs", label: "First appearance, latest", min: 1000, max: 40000, step: 500, unit: "ms" },
+      { key: "glassesGapMinMs", label: "Next appearance, shortest gap", min: 3000, max: 120000, step: 1000, unit: "ms" },
+      { key: "glassesGapMaxMs", label: "Next appearance, longest gap", min: 3000, max: 150000, step: 1000, unit: "ms" },
+    ],
+  },
   {
     title: "Blink and eyes",
     sliders: [
@@ -63,6 +86,14 @@ export function TuningPage() {
   const values = useTuning();
   const [copied, setCopied] = useState(false);
   const [chomp, setChomp] = useState<(Chomp & { key: number }) | null>(null);
+  const [covered, setCovered] = useState(false);
+
+  useEffect(() => {
+    if (!detector) return;
+    return detector.on("eyePositions", (eyes) => {
+      setCovered(bothEyesCovered(eyes.left, eyes.right, { x: 0.5, y: 0.5 }, getTuning()));
+    });
+  }, [detector]);
   const chompCount = useRef(0);
 
   function onChomp(c: Chomp) {
@@ -106,6 +137,12 @@ export function TuningPage() {
               onEat={() => undefined}
               onChomp={onChomp}
             />
+            <span
+              className={`sunglasses preview${covered ? " covering" : ""}`}
+              style={{ left: "50%", top: "50%", fontSize: `calc(${values.glassesWidth} * 100cqw)` }}
+            >
+              🕶️
+            </span>
             {chomp && (
               <div
                 key={chomp.key}
@@ -124,7 +161,10 @@ export function TuningPage() {
               </div>
             )}
           </div>
-          <p className="hint">{detector ? "Live face readings" : status}</p>
+          <p className="hint">
+            {detector ? "Live face readings" : status}
+            {detector && (covered ? " · sunglasses covering both eyes" : " · sunglasses not covering both eyes")}
+          </p>
           <LiveBar label="eyeBlinkLeft" value={live.eyeBlinkLeft} threshold={values.blinkOn} />
           <LiveBar label="eyeBlinkRight" value={live.eyeBlinkRight} threshold={values.blinkOn} />
           <LiveBar label="jawOpen" value={live.jawOpen} threshold={values.mouthOn} />

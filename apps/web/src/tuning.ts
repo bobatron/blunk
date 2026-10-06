@@ -15,6 +15,17 @@ export interface Tuning {
   mouthOn: number;
   mouthOff: number;
   tongueOn: number;
+  glassesWidth: number;
+  glassesHeight: number;
+  glassesCoverSlack: number;
+  glassesFirstMinMs: number;
+  glassesFirstMaxMs: number;
+  glassesGapMinMs: number;
+  glassesGapMaxMs: number;
+  glassesLifetimeMs: number;
+  glassesSpeed: number;
+  glassesTurnMinMs: number;
+  glassesTurnMaxMs: number;
   bugFirstSpawnMs: number;
   bugSpawnMinMs: number;
   bugSpawnMaxMs: number;
@@ -35,6 +46,17 @@ export const DEFAULT_TUNING: Tuning = {
   mouthOn: 0.25,
   mouthOff: 0.15,
   tongueOn: 0.5,
+  glassesWidth: 0.2,
+  glassesHeight: 0.08,
+  glassesCoverSlack: 0.9,
+  glassesFirstMinMs: 8000,
+  glassesFirstMaxMs: 14000,
+  glassesGapMinMs: 18000,
+  glassesGapMaxMs: 30000,
+  glassesLifetimeMs: 5000,
+  glassesSpeed: 0.25,
+  glassesTurnMinMs: 400,
+  glassesTurnMaxMs: 1000,
   bugFirstSpawnMs: 5500,
   bugSpawnMinMs: 15000,
   bugSpawnMaxMs: 25000,
