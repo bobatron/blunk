@@ -32,8 +32,9 @@ export interface GameServerEvents {
   "life-lost": (payload: {
     playerId: string;
     livesLeft: number;
-    reason: "eye-closed" | "eyes-missing";
+    reason: "eye-closed" | "eyes-missing" | "photo";
   }) => void;
+  "photo-taken": (payload: { playerId: string }) => void;
   "player-eliminated": (payload: { playerId: string; serverTimestamp: number; place: number }) => void;
   "blink-break": (payload: { playerId: string; until: number }) => void;
   "round-over": (payload: { winnerId: string | null }) => void;
@@ -99,6 +100,11 @@ export class GameServerConnection {
 
   setConfig(config: RoomConfig): void {
     this.send({ type: "set-config", ...config });
+  }
+
+  /** Blinked while sunglasses covered the eyes. */
+  sendMaskedBlink(): void {
+    this.send({ type: "masked-blink" });
   }
 
   /** Either eye closed during a round. */

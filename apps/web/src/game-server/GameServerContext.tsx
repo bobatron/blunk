@@ -32,6 +32,7 @@ export function GameServerProvider({
   const [scores, setScores] = useState<Record<string, number>>({});
   const [blinkBreaks, setBlinkBreaks] = useState<Record<string, number>>({});
   const [lastLifeLost, setLastLifeLost] = useState<LifeLostEvent | null>(null);
+  const [lastPhoto, setLastPhoto] = useState<GameServerState["lastPhoto"]>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [bugHunt, setBugHunt] = useState<GameServerState["bugHunt"]>(null);
   const [huntClaim, setHuntClaim] = useState<GameServerState["huntClaim"]>(null);
@@ -75,6 +76,10 @@ export function GameServerProvider({
       connection.on("life-lost", ({ playerId, livesLeft, reason }) => {
         lifeKey += 1;
         setLastLifeLost({ playerId, livesLeft, reason, key: lifeKey });
+      }),
+      connection.on("photo-taken", ({ playerId }) => {
+        lifeKey += 1;
+        setLastPhoto({ playerId, key: lifeKey });
       }),
       connection.on("player-eliminated", ({ playerId, place }) => {
         setEliminations((prev) => [...prev, { playerId, place }]);
@@ -167,6 +172,7 @@ export function GameServerProvider({
     scores,
     blinkBreaks,
     lastLifeLost,
+    lastPhoto,
     bugHunt,
     huntClaim,
     bugHuntResults,
@@ -177,6 +183,7 @@ export function GameServerProvider({
     startRound: () => connectionRef.current?.startRound(),
     setConfig: (c) => connectionRef.current?.setConfig(c),
     sendBlunk: () => connectionRef.current?.sendEyeClosed(),
+    sendMaskedBlink: () => connectionRef.current?.sendMaskedBlink(),
     sendEyesMissing: () => connectionRef.current?.sendEyesMissing(),
     earnPowerup: () => connectionRef.current?.earnPowerup(),
     usePowerup: () => connectionRef.current?.usePowerup(),

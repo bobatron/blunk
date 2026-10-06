@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import type { FaceSignalsDetector } from "./face-signals/FaceSignalsDetector";
 import type { HuntBug } from "./game-server/context";
 import { getTuning } from "./tuning";
+import { toLayerPx } from "./layerMath";
+import { playChomp } from "./sounds";
 
 /** A bug on this player's screen, positioned in tile-normalized (0–1) space. */
 interface Bug {
@@ -46,24 +48,6 @@ function pointOnPath(bug: HuntBug, now: number): { x: number; y: number } | null
     }
   }
   return null;
-}
-
-/** Layer px for a mouth position in the (mirrored, object-fit: cover) video. */
-function toLayerPx(
-  layer: HTMLElement,
-  video: HTMLVideoElement,
-  nx: number,
-  ny: number,
-): { x: number; y: number } | null {
-  if (!video.videoWidth || !video.videoHeight) return null;
-  const w = layer.clientWidth;
-  const h = layer.clientHeight;
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-  const scale = Math.max(w / vw, h / vh);
-  const ox = (w - vw * scale) / 2;
-  const oy = (h - vh * scale) / 2;
-  return { x: ox + (1 - nx) * vw * scale, y: oy + ny * vh * scale };
 }
 
 /** One mouth-close, with the eat area it was checked against. */
@@ -158,6 +142,7 @@ export function BugField(props: Props) {
         const hit = distances.find(({ d }) => d < radius)?.b;
         onChompRef.current?.({ x: mouth.x, y: mouth.y, radius, hit: Boolean(hit), nearest });
         if (!hit) return;
+        playChomp();
         if (modeRef.current === "shared") {
           onClaimRef.current?.(hit.id);
         } else {

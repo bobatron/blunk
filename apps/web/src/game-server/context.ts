@@ -9,7 +9,7 @@ export interface Elimination {
 export interface LifeLostEvent {
   playerId: string;
   livesLeft: number;
-  reason: "eye-closed" | "eyes-missing";
+  reason: "eye-closed" | "eyes-missing" | "photo";
   /** Changes every event so consumers can react to repeats. */
   key: number;
 }
@@ -38,6 +38,8 @@ export interface GameServerState {
   /** Player id -> epoch ms when their blink-break ends. */
   blinkBreaks: Record<string, number>;
   lastLifeLost: LifeLostEvent | null;
+  /** Latest sunglasses photo, so everyone can hear the shutter. */
+  lastPhoto: { playerId: string; key: number } | null;
   /** Bug Hunt round in the lobby: when it ends, eaten counts, and the live bugs. */
   bugHunt: { endsAt: number; eaten: Record<string, number>; bugs: HuntBug[] } | null;
   /** Latest bug claim, so the player who got it can be told. */
@@ -53,6 +55,7 @@ export interface GameServerState {
   startRound: () => void;
   setConfig: (config: RoomConfig) => void;
   sendBlunk: () => void;
+  sendMaskedBlink: () => void;
   sendEyesMissing: () => void;
   earnPowerup: () => void;
   usePowerup: () => void;

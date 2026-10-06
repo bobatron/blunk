@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocalFace } from "./localFace";
 import { useGameServer } from "./game-server/useGameServer";
 import { BugField } from "./BugField";
+import { Sunglasses } from "./Sunglasses";
 
 /**
  * Bugs on your own tile. During a lobby Bug Hunt, bugs are shared and eating
@@ -39,6 +40,7 @@ export function PowerupLayer() {
           }}
         />
       )}
+      {!hunting && <Sunglasses />}
       {eatCount > 0 && !hunting && <Toast key={eatCount} text="Ate a bug: +1 Blink-break" />}
       {hunting && huntClaim?.playerId === playerId && (
         <Toast key={huntClaim.key} text="Bug eaten!" />

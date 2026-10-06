@@ -22,6 +22,10 @@ export interface FaceSignalsEvents {
   mouthOpen: () => void;
   mouthClosed: () => void;
   eyebrowRaise: () => void;
+  /** Normalized (0–1) centres of each eye's iris, in the video frame. */
+  eyePositions: (payload: { left: { x: number; y: number }; right: { x: number; y: number } }) => void;
+  /** Tongue sticks out (rising edge). */
+  tongueOut: () => void;
   /** Normalized (0–1) position of the centre of the mouth, in the video frame. */
   mouthPosition: (payload: { x: number; y: number }) => void;
   /** Face has been undetected for the warning delay (tuning: eyesWarningMs). */
@@ -35,14 +39,17 @@ export interface FaceSignalsEvents {
     eyeBlinkRight: number;
     jawOpen: number;
     browOuterUp: number;
+    tongueOut: number;
   }) => void;
 }
 
 type EventName = keyof FaceSignalsEvents;
 
-// Inner lip landmarks in MediaPipe's 478-point face mesh.
+// Inner lip landmarks and iris centres in MediaPipe's 478-point face mesh.
 const UPPER_INNER_LIP = 13;
 const LOWER_INNER_LIP = 14;
+const LEFT_IRIS = 468;
+const RIGHT_IRIS = 473;
 
 let sharedVisionPromise: ReturnType<typeof FilesetResolver.forVisionTasks> | null = null;
 
@@ -71,6 +78,7 @@ export class FaceSignalsDetector {
   private rightWinkFrames = 0;
   private lastFaceAt = 0;
   private eyesWarned = false;
+  private tongueOutState = false;
   private video: HTMLVideoElement;
 
   constructor(video: HTMLVideoElement) {
@@ -124,6 +132,11 @@ export class FaceSignalsDetector {
         const categories = result.faceBlendshapes[0]?.categories;
         const landmarks = result.faceLandmarks[0];
         this.updatePresence(Boolean(categories), now);
+        if (landmarks) {
+          const l = landmarks[LEFT_IRIS];
+          const r = landmarks[RIGHT_IRIS];
+          this.emit("eyePositions", { left: { x: l.x, y: l.y }, right: { x: r.x, y: r.y } });
+        }
         if (categories) this.processCategories(categories);
         if (landmarks) {
           const upper = landmarks[UPPER_INNER_LIP];
@@ -165,7 +178,7 @@ export class FaceSignalsDetector {
     const jawOpen = get("jawOpen");
     const browOuterUp = (get("browOuterUpLeft") + get("browOuterUpRight")) / 2;
 
-    this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp });
+    this.emit("scores", { eyeBlinkLeft, eyeBlinkRight, jawOpen, browOuterUp, tongueOut: get("tongueOut") });
 
     // Blink: both eyes closed together.
     const bothClosed = eyeBlinkLeft > t.blinkOn && eyeBlinkRight > t.blinkOn;
@@ -193,6 +206,15 @@ export class FaceSignalsDetector {
     this.rightWinkFrames = rightAsymmetric ? this.rightWinkFrames + 1 : 0;
     if (this.leftWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "left" });
     if (this.rightWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "right" });
+
+    // Tongue out: rising edge, with hysteresis so it doesn't flicker.
+    const tongue = get("tongueOut");
+    if (tongue > t.tongueOn && !this.tongueOutState) {
+      this.tongueOutState = true;
+      this.emit("tongueOut");
+    } else if (tongue < t.tongueOn * 0.6) {
+      this.tongueOutState = false;
+    }
 
     // Mouth open/closed.
     if (jawOpen > t.mouthOn && !this.mouthOpenState) {

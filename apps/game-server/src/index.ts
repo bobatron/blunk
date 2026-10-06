@@ -118,7 +118,7 @@ function eliminate(room: Room, playerId: string) {
 
 // Every life lost — blink or eyes-not-visible — goes through here, so the
 // server is the only thing deciding who's still in. Blink-break ignores it.
-function loseLife(room: Room, playerId: string, reason: "eye-closed" | "eyes-missing") {
+function loseLife(room: Room, playerId: string, reason: "eye-closed" | "eyes-missing" | "photo") {
   if (!room.roundActive) return;
   const current = room.lives.get(playerId);
   if (!current || current <= 0) return;
@@ -353,6 +353,18 @@ wss.on("connection", (socket) => {
       case "blunk": {
         if (!joinedRoom || !playerId) return;
         loseLife(joinedRoom, playerId, "eye-closed");
+        break;
+      }
+
+      // Blinking behind sunglasses: a photo. Everyone else still in the round loses a life.
+      case "masked-blink": {
+        const room = joinedRoom;
+        if (!room || !playerId || !room.roundActive) return;
+        if (!(room.lives.get(playerId) ?? 0)) return;
+        broadcast(room, { type: "photo-taken", playerId });
+        for (const id of aliveIds(room)) {
+          if (id !== playerId) loseLife(room, id, "photo");
+        }
         break;
       }
 

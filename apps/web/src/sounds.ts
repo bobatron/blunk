@@ -50,6 +50,33 @@ export function playLifeLost() {
   tone(330, { startFrequency: 520, duration: 0.25, type: "triangle", gain: 0.25 });
 }
 
+/** A short bubbly pop when a bug is eaten. */
+export function playChomp() {
+  tone(900, { startFrequency: 380, duration: 0.09, type: "sine", gain: 0.3 });
+}
+
+/** A camera shutter: a short noise burst with a click on top. */
+export function playCamera() {
+  try {
+    const audio = getContext();
+    const length = Math.floor(audio.sampleRate * 0.12);
+    const buffer = audio.createBuffer(1, length, audio.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / length) ** 3;
+    }
+    const noise = audio.createBufferSource();
+    const noiseGain = audio.createGain();
+    noiseGain.gain.value = 0.6;
+    noise.buffer = buffer;
+    noise.connect(noiseGain).connect(audio.destination);
+    noise.start();
+  } catch {
+    // audio isn't essential
+  }
+  tone(2400, { startFrequency: 1200, duration: 0.05, type: "square", gain: 0.12 });
+}
+
 /** A new player joining the lobby. */
 export function playJoin() {
   tone(660, { duration: 0.1, type: "triangle", gain: 0.15 });

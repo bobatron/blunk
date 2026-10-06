@@ -33,6 +33,7 @@ const SECTIONS: Section[] = [
     sliders: [
       { key: "mouthOn", label: "Mouth opens above", min: 0.05, max: 1, step: 0.01 },
       { key: "mouthOff", label: "Mouth closes below", min: 0.02, max: 0.8, step: 0.01 },
+      { key: "tongueOn", label: "Tongue out above (blink-break)", min: 0.05, max: 1, step: 0.01 },
     ],
   },
   {
@@ -128,6 +129,7 @@ export function TuningPage() {
           <LiveBar label="eyeBlinkRight" value={live.eyeBlinkRight} threshold={values.blinkOn} />
           <LiveBar label="jawOpen" value={live.jawOpen} threshold={values.mouthOn} />
           <LiveBar label="browOuterUp" value={live.browOuterUp} threshold={0.4} />
+          <LiveBar label="tongueOut" value={live.tongueOut} threshold={values.tongueOn} />
           <div className="tuning-actions">
             <button type="button" className="join-button" onClick={copySettings}>
               {copied ? "Copied" : "Copy settings"}
@@ -175,9 +177,10 @@ interface Live {
   eyeBlinkRight: number;
   jawOpen: number;
   browOuterUp: number;
+  tongueOut: number;
 }
 
-const NO_FACE: Live = { eyeBlinkLeft: 0, eyeBlinkRight: 0, jawOpen: 0, browOuterUp: 0 };
+const NO_FACE: Live = { eyeBlinkLeft: 0, eyeBlinkRight: 0, jawOpen: 0, browOuterUp: 0, tongueOut: 0 };
 
 /** Face scores sampled at 10 Hz, so the page isn't re-rendered every frame. */
 function useLiveScores(detector: { on: (e: "scores", h: (p: Live) => void) => () => void } | null): Live {

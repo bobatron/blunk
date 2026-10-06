@@ -14,6 +14,7 @@ export interface Tuning {
   eyesMissingMs: number;
   mouthOn: number;
   mouthOff: number;
+  tongueOn: number;
   bugFirstSpawnMs: number;
   bugSpawnMinMs: number;
   bugSpawnMaxMs: number;
@@ -33,6 +34,7 @@ export const DEFAULT_TUNING: Tuning = {
   eyesMissingMs: 3000,
   mouthOn: 0.25,
   mouthOff: 0.15,
+  tongueOn: 0.5,
   bugFirstSpawnMs: 5500,
   bugSpawnMinMs: 15000,
   bugSpawnMaxMs: 25000,

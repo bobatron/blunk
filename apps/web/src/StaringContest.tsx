@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
-import { playBlunk, playLifeLost, playRoundStart } from "./sounds";
+import { playBlunk, playCamera, playLifeLost, playRoundStart } from "./sounds";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());
@@ -16,7 +16,9 @@ function useNow(intervalMs: number): number {
  * is lost, and the big "BLUNK!" reveal when someone's out.
  */
 export function StaringContest() {
-  const { playerId, players, roundActive, roundEndsAt, eliminations, lastLifeLost } = useGameServer();
+  const { playerId, players, roundActive, roundEndsAt, eliminations, lastLifeLost, lastPhoto } =
+    useGameServer();
+  const [photoToast, setPhotoToast] = useState<{ text: string; key: number } | null>(null);
   const [flash, setFlash] = useState<{ name: string; key: number } | null>(null);
   const [lifeToast, setLifeToast] = useState<string | null>(null);
   const wasRoundActive = useRef(false);
@@ -46,7 +48,12 @@ export function StaringContest() {
     // life lost while still in the round gets this sound and message.
     if (lastLifeLost.livesLeft > 0) {
       playLifeLost();
-      const reason = lastLifeLost.reason === "eyes-missing" ? "eyes not visible" : "eyes closed";
+      const reason =
+        lastLifeLost.reason === "eyes-missing"
+          ? "eyes not visible"
+          : lastLifeLost.reason === "photo"
+            ? "caught in a photo"
+            : "eyes closed";
       setLifeToast(`${name} lost a life (${reason}) — ${lastLifeLost.livesLeft} left`);
       const timer = setTimeout(() => setLifeToast(null), 1800);
       return () => clearTimeout(timer);
@@ -54,7 +61,17 @@ export function StaringContest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastLifeLost]);
 
-  if (!roundActive && !flash && !lifeToast) return null;
+  useEffect(() => {
+    if (!lastPhoto) return;
+    playCamera();
+    const name = players.find((p) => p.id === lastPhoto.playerId)?.name ?? "Someone";
+    setPhotoToast({ text: `📸 ${name} got a photo!`, key: lastPhoto.key });
+    const timer = setTimeout(() => setPhotoToast(null), 1800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastPhoto]);
+
+  if (!roundActive && !flash && !lifeToast && !photoToast) return null;
 
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
   const remainingSec = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
@@ -69,6 +86,11 @@ export function StaringContest() {
         </p>
       )}
       {lifeToast && <p className="life-toast">{lifeToast}</p>}
+      {photoToast && (
+        <p key={photoToast.key} className="life-toast photo-toast">
+          {photoToast.text}
+        </p>
+      )}
       {flash && (
         <div key={flash.key} className="blunk-flash">
           <div className="blunk-stamp">BLUNK!</div>
