@@ -6,21 +6,38 @@ interface Bug {
   id: number;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
+  /** Heading in radians; changes at random intervals so the path is erratic. */
+  angle: number;
+  speed: number;
+  turnAt: number;
   expiresAt: number;
 }
 
-const BUG_LIFETIME_MS = 7000;
-const EAT_RADIUS_PX = 56;
-const TICK_MS = 50;
-const SPAWN_MIN_MS = 8000;
-const SPAWN_MAX_MS = 14000;
+const BUG_LIFETIME_MS = 3500;
+const EAT_RADIUS_PX = 60;
+const TICK_MS = 40;
+const SPAWN_MIN_MS = 15000;
+const SPAWN_MAX_MS = 25000;
+const FIRST_SPAWN_MIN_MS = 4000;
+const FIRST_SPAWN_MAX_MS = 7000;
+
+function randomBug(id: number, w: number, h: number, now: number): Bug {
+  return {
+    id,
+    x: Math.random() * w,
+    y: Math.random() * h,
+    angle: Math.random() * Math.PI * 2,
+    speed: 120 + Math.random() * 100,
+    turnAt: now + 200 + Math.random() * 500,
+    expiresAt: now + BUG_LIFETIME_MS,
+  };
+}
 
 /**
- * Power-ups for your own tile: bugs drift across your face-cam, and if you
- * open and close your mouth over one, you eat it and earn a power-up
- * (currently just a blink-break). Rendered inside the local grid tile.
+ * Power-ups for your own tile: bugs dart across your face-cam in erratic
+ * paths for a few seconds, and if you open and close your mouth over one, you
+ * eat it and earn a power-up (currently just a blink-break). Rendered inside
+ * the local grid tile.
  */
 export function PowerupLayer() {
   const { detector, videoRef } = useLocalFace();
@@ -35,7 +52,6 @@ export function PowerupLayer() {
   bugsRef.current = bugs;
   const mouthRef = useRef<{ x: number; y: number } | null>(null); // in tile px
   const nextId = useRef(1);
-  const latestNormalizedMouth = useRef<{ x: number; y: number } | null>(null);
 
   // Map the normalized mouth position into tile pixels, accounting for the
   // video being object-fit: cover and mirrored for self-view.
@@ -57,7 +73,6 @@ export function PowerupLayer() {
     if (!detector) return;
     const offs = [
       detector.on("mouthPosition", (p) => {
-        latestNormalizedMouth.current = p;
         mouthRef.current = toTilePx(p.x, p.y);
       }),
       detector.on("mouthClosed", () => {
@@ -77,7 +92,7 @@ export function PowerupLayer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detector]);
 
-  // Spawn bugs at random intervals while the player is still in the round.
+  // Bugs appear now and then while the player is still in the round.
   useEffect(() => {
     if (!alive) {
       setBugs([]);
@@ -87,29 +102,19 @@ export function PowerupLayer() {
     const spawn = () => {
       const layer = layerRef.current;
       if (layer) {
-        const w = layer.clientWidth;
-        const h = layer.clientHeight;
-        const angle = Math.random() * Math.PI * 2;
-        const speed = 40 + Math.random() * 40;
-        setBugs((prev) => [
-          ...prev,
-          {
-            id: nextId.current++,
-            x: Math.random() * w,
-            y: Math.random() * h,
-            vx: Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            expiresAt: Date.now() + BUG_LIFETIME_MS,
-          },
-        ]);
+        const bug = randomBug(nextId.current++, layer.clientWidth, layer.clientHeight, Date.now());
+        setBugs((prev) => [...prev, bug]);
       }
       timer = setTimeout(spawn, SPAWN_MIN_MS + Math.random() * (SPAWN_MAX_MS - SPAWN_MIN_MS));
     };
-    timer = setTimeout(spawn, 2000 + Math.random() * 3000);
+    timer = setTimeout(
+      spawn,
+      FIRST_SPAWN_MIN_MS + Math.random() * (FIRST_SPAWN_MAX_MS - FIRST_SPAWN_MIN_MS),
+    );
     return () => clearTimeout(timer);
   }, [alive]);
 
-  // Drift bugs around the tile and drop them when they expire.
+  // Move bugs in erratic, jittery paths, bounce off edges, and drop them on expiry.
   useEffect(() => {
     if (!alive) return;
     const interval = setInterval(() => {
@@ -123,15 +128,24 @@ export function PowerupLayer() {
         prev
           .filter((b) => b.expiresAt > now)
           .map((b) => {
-            let x = b.x + b.vx * dt;
-            let y = b.y + b.vy * dt;
-            let vx = b.vx;
-            let vy = b.vy;
-            if (x < 0 || x > w) vx = -vx;
-            if (y < 0 || y > h) vy = -vy;
-            x = Math.min(Math.max(x, 0), w);
-            y = Math.min(Math.max(y, 0), h);
-            return { ...b, x, y, vx, vy };
+            let angle = b.angle;
+            let turnAt = b.turnAt;
+            if (now >= turnAt) {
+              angle = Math.random() * Math.PI * 2;
+              turnAt = now + 200 + Math.random() * 500;
+            }
+            const speed = b.speed * (0.6 + Math.random() * 0.8);
+            let x = b.x + Math.cos(angle) * speed * dt;
+            let y = b.y + Math.sin(angle) * speed * dt;
+            if (x < 0 || x > w) {
+              angle = Math.PI - angle;
+              x = Math.min(Math.max(x, 0), w);
+            }
+            if (y < 0 || y > h) {
+              angle = -angle;
+              y = Math.min(Math.max(y, 0), h);
+            }
+            return { ...b, x, y, angle, turnAt };
           }),
       );
     }, TICK_MS);
