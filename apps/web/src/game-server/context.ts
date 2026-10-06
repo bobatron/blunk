@@ -30,6 +30,12 @@ export interface GameServerState {
   /** Player id -> epoch ms when their blink-break ends. */
   blinkBreaks: Record<string, number>;
   lastLifeLost: LifeLostEvent | null;
+  /** Bug Hunt round in the lobby: when it ends, and eaten count per player. */
+  bugHunt: { endsAt: number; eaten: Record<string, number> } | null;
+  /** Results of the last Bug Hunt, ranked. */
+  bugHuntResults: { playerId: string; eaten: number }[] | null;
+  /** Face snapshots from the current or last round. */
+  snapshots: { id: number; playerId: string; image: string }[];
   errorMessage: string | null;
   startRound: () => void;
   setConfig: (config: RoomConfig) => void;
@@ -37,6 +43,9 @@ export interface GameServerState {
   sendEyesMissing: () => void;
   earnPowerup: () => void;
   usePowerup: () => void;
+  startBugHunt: () => void;
+  bugEaten: () => void;
+  sendSnapshot: (image: string) => void;
 }
 
 export const GameServerContext = createContext<GameServerState | null>(null);

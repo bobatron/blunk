@@ -31,8 +31,8 @@ export const DEFAULT_TUNING: Tuning = {
   winkDebounceFrames: 3,
   eyesWarningMs: 1000,
   eyesMissingMs: 3000,
-  mouthOn: 0.4,
-  mouthOff: 0.2,
+  mouthOn: 0.25,
+  mouthOff: 0.15,
   bugFirstSpawnMs: 5500,
   bugSpawnMinMs: 15000,
   bugSpawnMaxMs: 25000,
@@ -41,7 +41,7 @@ export const DEFAULT_TUNING: Tuning = {
   bugSpeedMax: 220,
   bugTurnMinMs: 200,
   bugTurnMaxMs: 700,
-  bugEatRadiusPx: 60,
+  bugEatRadiusPx: 40,
 };
 
 const STORAGE_KEY = "blunk-tuning";

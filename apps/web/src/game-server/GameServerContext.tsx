@@ -27,12 +27,16 @@ export function GameServerProvider({
   const [blinkBreaks, setBlinkBreaks] = useState<Record<string, number>>({});
   const [lastLifeLost, setLastLifeLost] = useState<LifeLostEvent | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [bugHunt, setBugHunt] = useState<GameServerState["bugHunt"]>(null);
+  const [bugHuntResults, setBugHuntResults] = useState<GameServerState["bugHuntResults"]>(null);
+  const [snapshots, setSnapshots] = useState<GameServerState["snapshots"]>([]);
 
   useEffect(() => {
     const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName);
     connectionRef.current = connection;
     const timers: ReturnType<typeof setTimeout>[] = [];
     let lifeKey = 0;
+    let snapshotId = 0;
 
     const unsubs = [
       connection.on("joined", ({ playerId }) => setPlayerId(playerId)),
@@ -52,6 +56,7 @@ export function GameServerProvider({
         setEliminations([]);
         setWinnerId(undefined);
         setBlinkBreaks({});
+        setSnapshots([]);
       }),
       connection.on("life-lost", ({ playerId, livesLeft, reason }) => {
         lifeKey += 1;
@@ -81,6 +86,22 @@ export function GameServerProvider({
           setScores((prev) => ({ ...prev, [winnerId]: (prev[winnerId] ?? 0) + 1 }));
         }
       }),
+      connection.on("bug-hunt-started", ({ endsAt }) => {
+        setBugHunt({ endsAt, eaten: {} });
+        setBugHuntResults(null);
+      }),
+      connection.on("bug-hunt-scores", ({ eaten }) => {
+        setBugHunt((prev) => (prev ? { ...prev, eaten } : prev));
+      }),
+      connection.on("bug-hunt-over", ({ results }) => {
+        setBugHunt(null);
+        setBugHuntResults([...results].sort((a, b) => b.eaten - a.eaten));
+      }),
+      connection.on("round-snapshot", ({ playerId, image }) => {
+        snapshotId += 1;
+        const id = snapshotId;
+        setSnapshots((prev) => [...prev, { id, playerId, image }]);
+      }),
       connection.on("error", ({ message }) => setErrorMessage(message)),
     ];
 
@@ -103,6 +124,9 @@ export function GameServerProvider({
     scores,
     blinkBreaks,
     lastLifeLost,
+    bugHunt,
+    bugHuntResults,
+    snapshots,
     errorMessage,
     startRound: () => connectionRef.current?.startRound(),
     setConfig: (c) => connectionRef.current?.setConfig(c),
@@ -110,6 +134,9 @@ export function GameServerProvider({
     sendEyesMissing: () => connectionRef.current?.sendEyesMissing(),
     earnPowerup: () => connectionRef.current?.earnPowerup(),
     usePowerup: () => connectionRef.current?.usePowerup(),
+    startBugHunt: () => connectionRef.current?.startBugHunt(),
+    bugEaten: () => connectionRef.current?.bugEaten(),
+    sendSnapshot: (image) => connectionRef.current?.sendSnapshot(image),
   };
 
   return <GameServerContext.Provider value={value}>{children}</GameServerContext.Provider>;

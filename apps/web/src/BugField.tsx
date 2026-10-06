@@ -38,6 +38,8 @@ interface Props {
   videoRef: RefObject<HTMLVideoElement | null>;
   onEat: () => void;
   eatLabel: string;
+  /** Fires when the mouth opens with a bug close by, before it's eaten. */
+  onMouthOpenNearBug?: () => void;
 }
 
 /**
@@ -45,7 +47,7 @@ interface Props {
  * over one, it's eaten. Fills its parent (position: absolute, inset: 0).
  * Every number comes from the tuning store, so it can be dialled live.
  */
-export function BugField({ active, detector, videoRef, onEat, eatLabel }: Props) {
+export function BugField({ active, detector, videoRef, onEat, eatLabel, onMouthOpenNearBug }: Props) {
   const layerRef = useRef<HTMLDivElement>(null);
   const [bugs, setBugs] = useState<Bug[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -53,6 +55,8 @@ export function BugField({ active, detector, videoRef, onEat, eatLabel }: Props)
   bugsRef.current = bugs;
   const onEatRef = useRef(onEat);
   onEatRef.current = onEat;
+  const onNearRef = useRef(onMouthOpenNearBug);
+  onNearRef.current = onMouthOpenNearBug;
   const mouthRef = useRef<{ x: number; y: number } | null>(null); // in layer px
   const nextId = useRef(1);
 
@@ -77,6 +81,14 @@ export function BugField({ active, detector, videoRef, onEat, eatLabel }: Props)
     const offs = [
       detector.on("mouthPosition", (p) => {
         mouthRef.current = toLayerPx(p.x, p.y);
+      }),
+      detector.on("mouthOpen", () => {
+        const mouth = mouthRef.current;
+        if (!mouth || !onNearRef.current) return;
+        const reach = getTuning().bugEatRadiusPx * 2;
+        if (bugsRef.current.some((b) => Math.hypot(b.x - mouth.x, b.y - mouth.y) < reach)) {
+          onNearRef.current();
+        }
       }),
       detector.on("mouthClosed", () => {
         const mouth = mouthRef.current;

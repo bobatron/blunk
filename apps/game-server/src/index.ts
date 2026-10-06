@@ -26,6 +26,9 @@ interface Room {
   powerups: Map<string, number>;
   blinkBreakUntil: Map<string, number>;
   roundTimer: NodeJS.Timeout | null;
+  bugHunt: { endsAt: number; eaten: Map<string, number>; timer: NodeJS.Timeout } | null;
+  snapshotCount: Map<string, number>;
+  lastSnapshotAt: Map<string, number>;
 }
 
 const DEFAULT_CONFIG: Config = { lives: 3, timeLimitSec: 90 };
@@ -49,6 +52,9 @@ function getOrCreateRoom(roomId: string): Room {
       powerups: new Map(),
       blinkBreakUntil: new Map(),
       roundTimer: null,
+      bugHunt: null,
+      snapshotCount: new Map(),
+      lastSnapshotAt: new Map(),
     };
     rooms.set(roomId, room);
   }
@@ -123,6 +129,20 @@ function loseLife(room: Room, playerId: string, reason: "eye-closed" | "eyes-mis
   broadcast(room, { type: "life-lost", playerId, livesLeft, reason });
   if (livesLeft === 0) eliminate(room, playerId);
   checkRoundEnd(room);
+  broadcastLobby(room);
+}
+
+const BUG_HUNT_MS = 60000;
+const SNAPSHOT_MAX_PER_ROUND = 8;
+const SNAPSHOT_MIN_GAP_MS = 1500;
+const SNAPSHOT_MAX_CHARS = 80000;
+
+function endBugHunt(room: Room) {
+  if (!room.bugHunt) return;
+  clearTimeout(room.bugHunt.timer);
+  const results = [...room.bugHunt.eaten].map(([playerId, eaten]) => ({ playerId, eaten }));
+  room.bugHunt = null;
+  broadcast(room, { type: "bug-hunt-over", results });
   broadcastLobby(room);
 }
 
@@ -239,6 +259,12 @@ wss.on("connection", (socket) => {
 
       case "start-round": {
         if (!joinedRoom || joinedRoom.roundActive) return;
+        if (joinedRoom.bugHunt) {
+          joinedRoom.players.get(playerId ?? "")?.socket.send(
+            JSON.stringify({ type: "error", message: "Wait for the Bug Hunt to finish" }),
+          );
+          return;
+        }
         if (joinedRoom.players.size < 2) {
           socket.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
           return;
@@ -249,6 +275,8 @@ wss.on("connection", (socket) => {
         room.powerups = new Map();
         room.blinkBreakUntil = new Map();
         room.lives = new Map([...room.players.keys()].map((id) => [id, room.config.lives]));
+        room.snapshotCount = new Map();
+        room.lastSnapshotAt = new Map();
         const { timeLimitSec } = room.config;
         const endsAt = timeLimitSec ? Date.now() + timeLimitSec * 1000 : null;
         broadcast(room, { type: "round-started", endsAt, lives: room.config.lives });
@@ -292,6 +320,49 @@ wss.on("connection", (socket) => {
         break;
       }
 
+      case "start-bug-hunt": {
+        if (!joinedRoom || !playerId || joinedRoom.roundActive || joinedRoom.bugHunt) return;
+        const room = joinedRoom;
+        const endsAt = Date.now() + BUG_HUNT_MS;
+        room.bugHunt = {
+          endsAt,
+          eaten: new Map(),
+          timer: setTimeout(() => endBugHunt(room), BUG_HUNT_MS),
+        };
+        broadcast(room, { type: "bug-hunt-started", endsAt });
+        broadcastLobby(room);
+        break;
+      }
+
+      case "bug-eaten": {
+        const room = joinedRoom;
+        if (!room || !playerId || !room.bugHunt) return;
+        room.bugHunt.eaten.set(playerId, (room.bugHunt.eaten.get(playerId) ?? 0) + 1);
+        broadcast(room, {
+          type: "bug-hunt-scores",
+          eaten: Object.fromEntries(room.bugHunt.eaten),
+        });
+        break;
+      }
+
+      // A small face snapshot taken when a player opens their mouth near a bug
+      // during a round. Relayed to the room; the server doesn't store images.
+      case "round-snapshot": {
+        const room = joinedRoom;
+        if (!room || !playerId || !room.roundActive) return;
+        if (!(room.lives.get(playerId) ?? 0)) return;
+        const image = message.image;
+        if (typeof image !== "string" || !image.startsWith("data:image/jpeg;base64,")) return;
+        if (image.length > SNAPSHOT_MAX_CHARS) return;
+        const count = room.snapshotCount.get(playerId) ?? 0;
+        const last = room.lastSnapshotAt.get(playerId) ?? 0;
+        if (count >= SNAPSHOT_MAX_PER_ROUND || Date.now() - last < SNAPSHOT_MIN_GAP_MS) return;
+        room.snapshotCount.set(playerId, count + 1);
+        room.lastSnapshotAt.set(playerId, Date.now());
+        broadcast(room, { type: "round-snapshot", playerId, image });
+        break;
+      }
+
       default:
         break;
     }
@@ -307,6 +378,7 @@ wss.on("connection", (socket) => {
       }
       room.players.delete(playerId);
       if (room.players.size === 0) {
+        if (room.bugHunt) clearTimeout(room.bugHunt.timer);
         if (room.roundTimer) clearTimeout(room.roundTimer);
         rooms.delete(room.id);
       } else {

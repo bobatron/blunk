@@ -23,6 +23,10 @@ export interface GameServerEvents {
   "player-eliminated": (payload: { playerId: string; serverTimestamp: number; place: number }) => void;
   "blink-break": (payload: { playerId: string; until: number }) => void;
   "round-over": (payload: { winnerId: string | null }) => void;
+  "bug-hunt-started": (payload: { endsAt: number }) => void;
+  "bug-hunt-scores": (payload: { eaten: Record<string, number> }) => void;
+  "bug-hunt-over": (payload: { results: { playerId: string; eaten: number }[] }) => void;
+  "round-snapshot": (payload: { playerId: string; image: string }) => void;
   error: (payload: { message: string }) => void;
 }
 
@@ -97,6 +101,18 @@ export class GameServerConnection {
 
   usePowerup(): void {
     this.send({ type: "use-powerup" });
+  }
+
+  startBugHunt(): void {
+    this.send({ type: "start-bug-hunt" });
+  }
+
+  bugEaten(): void {
+    this.send({ type: "bug-eaten" });
+  }
+
+  sendSnapshot(image: string): void {
+    this.send({ type: "round-snapshot", image });
   }
 
   close(): void {

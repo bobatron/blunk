@@ -764,3 +764,53 @@ button {
     position: static;
   }
 }
+
+/* --- Lobby: Bug Hunt and mouth moments --- */
+
+.lobby-bughunt,
+.lobby-snapshots {
+  text-align: center;
+}
+
+.lobby-bughunt h3,
+.lobby-snapshots h3 {
+  margin: 0 0 4px;
+}
+
+.hunt-time {
+  font-family: var(--shout);
+  font-size: 22px;
+  color: var(--gold);
+  margin: 0;
+}
+
+.hunt-scores,
+.hunt-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+.snapshot-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  max-width: min(90vw, 760px);
+  padding-bottom: 4px;
+}
+
+.snapshot-strip figure {
+  margin: 0;
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 12px;
+}
+
+.snapshot-strip img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}

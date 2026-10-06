@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
 import { Scoreboard } from "./Scoreboard";
 import { playJoin, playWinnerFanfare } from "./sounds";
@@ -12,14 +12,36 @@ const TIME_CHOICES: { label: string; value: number | null }[] = [
   { label: "∞", value: null },
 ];
 
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
 /**
  * Where players land before a round starts (and again between rounds):
  * who's here, the round settings, the running scoreboard, and the start
  * button. Settings are shared, so everyone sees the same lives and timer.
  */
 export function Lobby() {
-  const { players, playerNames, roundActive, winnerId, config, setConfig, startRound, errorMessage } =
-    useGameServer();
+  const {
+    players,
+    playerNames,
+    roundActive,
+    winnerId,
+    config,
+    setConfig,
+    startRound,
+    errorMessage,
+    bugHunt,
+    bugHuntResults,
+    startBugHunt,
+    snapshots,
+  } = useGameServer();
+  const now = useNow(250);
   const prevPlayerCount = useRef<number | null>(null);
   const announcedWinner = useRef<string | null>(null);
 
@@ -90,6 +112,45 @@ export function Lobby() {
           </div>
         </div>
       </div>
+      <div className="lobby-bughunt">
+        <h3>Bug Hunt</h3>
+        {bugHunt ? (
+          <>
+            <p className="hunt-time">{Math.max(0, Math.ceil((bugHunt.endsAt - now) / 1000))}s left, eat bugs!</p>
+            <ul className="hunt-scores">
+              {players.map((p) => (
+                <li key={p.id}>
+                  {p.name}: <strong>{bugHunt.eaten[p.id] ?? 0}</strong>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <>
+            {bugHuntResults && (
+              <p className="hunt-results">
+                {bugHuntResults.map((r) => `${playerNames[r.playerId] ?? "?"} ${r.eaten}`).join(" · ")}
+              </p>
+            )}
+            <button type="button" onClick={startBugHunt}>
+              Play Bug Hunt (60s)
+            </button>
+          </>
+        )}
+      </div>
+      {snapshots.length > 0 && (
+        <div className="lobby-snapshots">
+          <h3>Mouth moments</h3>
+          <div className="snapshot-strip">
+            {snapshots.map((s) => (
+              <figure key={s.id}>
+                <img src={s.image} alt="" />
+                <figcaption>{playerNames[s.playerId] ?? "?"}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="lobby-players">
         <h3>Players ({players.length})</h3>
         <ul>

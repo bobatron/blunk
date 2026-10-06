@@ -1,24 +1,37 @@
 import { useLocalFace } from "./localFace";
 import { useGameServer } from "./game-server/useGameServer";
 import { BugField } from "./BugField";
+import { captureFace } from "./captureFace";
 
 /**
- * Power-ups on your own tile: bugs drift over your face-cam, and eating one
- * earns a power-up (currently a blink-break). Only while you're still in.
+ * Bugs on your own tile. During a round, eating one earns a power-up and
+ * opening your mouth near one takes a face snapshot for the end-of-round
+ * gallery. During a lobby Bug Hunt, every eaten bug counts toward your score.
  */
 export function PowerupLayer() {
   const { detector, videoRef } = useLocalFace();
-  const { roundActive, playerId, players, earnPowerup } = useGameServer();
+  const { roundActive, playerId, players, earnPowerup, bugHunt, bugEaten, sendSnapshot } =
+    useGameServer();
   const me = players.find((p) => p.id === playerId);
   const alive = roundActive && (me?.lives ?? 0) > 0;
+  const hunting = bugHunt !== null;
 
   return (
     <BugField
-      active={alive}
+      active={alive || hunting}
       detector={detector}
       videoRef={videoRef}
-      onEat={earnPowerup}
-      eatLabel="Ate a bug: +1 Blink-break"
+      onEat={hunting ? bugEaten : earnPowerup}
+      eatLabel={hunting ? "Bug eaten!" : "Ate a bug: +1 Blink-break"}
+      onMouthOpenNearBug={
+        alive
+          ? () => {
+              const video = videoRef.current;
+              const image = video ? captureFace(video) : null;
+              if (image) sendSnapshot(image);
+            }
+          : undefined
+      }
     />
   );
 }
