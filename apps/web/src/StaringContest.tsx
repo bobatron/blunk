@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
 import { playBlunk, playCamera, playLifeLost, playRoundStart } from "./sounds";
+import "./StaringContest.css";
 
 function useNow(intervalMs: number): number {
   const [now, setNow] = useState(() => Date.now());

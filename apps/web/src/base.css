@@ -1,0 +1,25 @@
+/* Retheme LiveKit's own prefab components (PreJoin, VideoConference
+   controls) to match the party palette instead of their default blue.
+   Extra ancestor compound selector so this reliably outranks
+   @livekit/components-styles regardless of CSS import order. */
+body [data-lk-theme] {
+  --lk-accent-bg: var(--accent);
+  --lk-accent2: #c45fff;
+  --lk-accent3: #d98cff;
+  --lk-accent4: #ecbfff;
+  --lk-danger: var(--secondary);
+  --lk-border-radius: 12px;
+}
+
+.error {
+  color: #d73a4a;
+}
+
+.hint {
+  font-size: 13px;
+  color: #888;
+}
+
+button {
+  font-family: var(--heading);
+}

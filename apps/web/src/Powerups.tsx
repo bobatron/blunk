@@ -3,6 +3,7 @@ import { useLocalFace } from "./localFace";
 import { useGameServer } from "./game-server/useGameServer";
 import { BugField } from "./BugField";
 import { Sunglasses } from "./Sunglasses";
+import "./Powerups.css";
 
 /**
  * Bugs on your own tile. During a lobby Bug Hunt, bugs are shared and eating

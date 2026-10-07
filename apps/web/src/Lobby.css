@@ -1,0 +1,177 @@
+.lobby {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: white;
+  padding: 10px 16px;
+  border-radius: 14px;
+  text-align: center;
+  font-family: var(--heading);
+  box-sizing: border-box;
+}
+
+.lobby h2 {
+  margin: 0;
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 26px;
+  letter-spacing: 0.02em;
+  color: white;
+}
+
+.lobby h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #ccc;
+}
+
+.lobby button {
+  font-size: 17px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--secondary));
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s ease;
+}
+
+.lobby button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.lobby button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+.lobby button:disabled {
+  background: #666;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.last-winner {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--gold);
+  animation: winner-bounce 0.6s ease;
+}
+
+@keyframes winner-bounce {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.trophy {
+  display: inline-block;
+}
+
+.lobby-players {
+  margin: 8px 0;
+}
+
+.lobby-players ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lobby .hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #ccc;
+}
+
+.lobby-settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px 24px;
+  width: 100%;
+}
+
+.setting-group h3 {
+  margin: 0 0 4px;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.choice-row .choice {
+  font-family: var(--heading);
+  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  background: transparent;
+  color: white;
+  cursor: pointer;
+}
+
+.choice-row .choice.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.lobby-bughunt,
+.lobby-snapshots {
+  text-align: center;
+}
+
+.lobby-bughunt h3,
+.lobby-snapshots h3 {
+  margin: 0 0 4px;
+}
+
+.hunt-time {
+  font-family: var(--shout);
+  font-size: 22px;
+  color: var(--gold);
+  margin: 0;
+}
+
+.hunt-scores,
+.hunt-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+.snapshot-strip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  max-width: min(90vw, 760px);
+  padding-bottom: 4px;
+}
+
+.snapshot-strip figure {
+  margin: 0;
+  flex: 0 0 auto;
+  text-align: center;
+  font-size: 12px;
+}
+
+.snapshot-strip img {
+  width: 120px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}

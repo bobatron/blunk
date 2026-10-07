@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GAME_SERVER_URL } from "./config";
 import { Logo } from "./Logo";
+import "./JoinScreen.css";
 
 export interface JoinDetails {
   roomName: string;

@@ -1,0 +1,185 @@
+.tuning {
+  min-height: 100svh;
+  box-sizing: border-box;
+  padding: 16px;
+  background: #120a1c;
+  color: white;
+  font-family: var(--heading);
+}
+
+.tuning a,
+.tuning-header a {
+  color: #ccc;
+}
+
+.tuning-header {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+}
+
+.tuning-header h1 {
+  color: white;
+  margin: 0;
+  font-family: var(--shout);
+  font-weight: 400;
+}
+
+.tuning-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.tuning-live {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: sticky;
+  top: 12px;
+}
+
+.tuning-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #000;
+  transform: scaleX(-1);
+}
+
+/* Camera preview + the bug field + the chomp-ring overlay. */
+.tuning-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #000;
+  container-type: size;
+}
+
+.tuning-stage .tuning-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.chomp-ring {
+  position: absolute;
+  z-index: 5;
+  border-radius: 50%;
+  border: 3px solid;
+  pointer-events: none;
+  animation: chomp-fade 1s ease-out forwards;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.chomp-ring.hit {
+  border-color: #1ff968;
+  background: rgba(31, 249, 104, 0.18);
+}
+
+.chomp-ring.miss {
+  border-color: #f91f31;
+  background: rgba(249, 31, 49, 0.15);
+}
+
+.chomp-label {
+  position: absolute;
+  bottom: -28px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 2px 8px;
+  border-radius: 6px;
+  color: white;
+}
+
+@keyframes chomp-fade {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.live-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 46px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.live-track {
+  position: relative;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.live-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.live-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--gold);
+}
+
+.tuning-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tuning-section {
+  margin-bottom: 18px;
+}
+
+.tuning-section h2 {
+  font-family: var(--shout);
+  font-weight: 400;
+  color: var(--gold);
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.tuning-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.tuning-row em {
+  color: var(--gold);
+  font-style: normal;
+}
+
+.tuning-row output {
+  font-variant-numeric: tabular-nums;
+  color: #ddd;
+  min-width: 70px;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .tuning-body {
+    grid-template-columns: 1fr;
+  }
+  .tuning-live {
+    position: static;
+  }
+}

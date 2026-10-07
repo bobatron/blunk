@@ -1,0 +1,25 @@
+/* Consolidated from two rounds of edits tonight (was a full-screen overlay,
+   then overridden into a lobby card) into the one rule that's actually in
+   effect now. */
+.moments-reel {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.moments-reel h3 {
+  margin: 0;
+}
+
+.moments-reel img {
+  width: 200px;
+  height: 150px;
+  border-radius: 10px;
+}
+
+.moments-reel p {
+  font-size: 14px;
+  font-weight: 600;
+}

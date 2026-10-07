@@ -1,0 +1,22 @@
+.sunglasses-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.sunglasses {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.6));
+}
+
+.sunglasses.preview {
+  opacity: 0.85;
+}
+
+.sunglasses.preview.covering {
+  filter: drop-shadow(0 0 6px #1ff968);
+}

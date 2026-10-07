@@ -5,7 +5,7 @@ import { ConferenceRoom } from "./ConferenceRoom";
 import { FaceSignalsDebug } from "./debug/FaceSignalsDebug";
 import { BugGame } from "./BugGame";
 import { TuningPage } from "./TuningPage";
-import "./App.css";
+import "./base.css";
 
 function App() {
   const [joinDetails, setJoinDetails] = useState<JoinDetails | null>(null);

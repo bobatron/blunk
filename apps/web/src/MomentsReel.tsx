@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
+import "./MomentsReel.css";
 
 const FRAME_MS = 1200;
 

@@ -4,6 +4,7 @@ import { toLayerPx } from "./layerMath";
 import { bothEyesCovered, type GlassesPos } from "./glassesMath";
 import { getTuning } from "./tuning";
 import { useGameServer } from "./game-server/useGameServer";
+import "./Sunglasses.css";
 
 const TICK_MS = 40;
 const rand = (min: number, max: number) => min + Math.random() * (max - min);

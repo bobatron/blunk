@@ -4,6 +4,8 @@ import { useStandaloneFace } from "./useStandaloneFace";
 import { BugField, type Chomp } from "./BugField";
 import { bothEyesCovered } from "./glassesMath";
 import { getTuning } from "./tuning";
+import "./TuningPage.css";
+import "./Sunglasses.css";
 
 interface Slider {
   key: keyof Tuning;

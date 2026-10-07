@@ -3,6 +3,7 @@ import { useGameServer } from "./game-server/useGameServer";
 import { Scoreboard } from "./Scoreboard";
 import { playJoin, playWinnerFanfare } from "./sounds";
 import { MomentsReel } from "./MomentsReel";
+import "./Lobby.css";
 
 const LIVES_CHOICES = [1, 2, 3, 5];
 const TIME_CHOICES: { label: string; value: number | null }[] = [

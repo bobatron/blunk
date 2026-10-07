@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BugField } from "./BugField";
 import { useStandaloneFace } from "./useStandaloneFace";
+import "./BugGame.css";
 
 const ROUND_SECONDS = 60;
 

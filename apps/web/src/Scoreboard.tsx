@@ -1,4 +1,5 @@
 import { useGameServer } from "./game-server/useGameServer";
+import "./Scoreboard.css";
 
 /** Cumulative points across all rounds played this session, highest first. */
 export function Scoreboard() {
