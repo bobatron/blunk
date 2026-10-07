@@ -11,6 +11,71 @@ See [PLANNING.md](./PLANNING.md) for architecture, roadmap, and how we work.
 - Web app: https://blunk-web.vercel.app
 - Game server: https://blunk-game-server.fly.dev
 
+## How to play
+
+This section tracks what's actually built, and should be updated in the same
+PR/commit as any gameplay change — it's the living reference; `PLANNING.md`
+is the design-decisions/roadmap history instead.
+
+**Join** — enter your name and a room code. The front camera is used
+automatically (no device picker); camera and mic can be toggled off before
+joining. Everyone in the same room code sees each other in a grid, including
+themselves — on a phone held upright, your own tile takes the top half and
+the others share the bottom half.
+
+**Lobby** — shown before a round and between rounds: who's connected, the
+scoreboard, shared round settings, and the Bug Hunt and Mouth Moments
+features below. Anyone can start a round or change settings while no round
+is active.
+
+- **Lives**: 1 / 2 / 3 / 5, default **3**.
+- **Timer**: 30s / 60s / 90s / 120s / infinite, default **90s**.
+
+**Staring Contest** — the main game. Free-for-all: everyone stares into
+their own camera; blinking (either eye, not just a two-eye blink) costs a
+life. Hit 0 lives and you're knocked out ("BLUNKED") but stay on screen to
+spectate. Eyes not detected for 3 seconds (face out of frame, covered, etc.)
+costs a life too, with a warning shown after 1 second. If the timer runs
+out, whoever has the most lives wins (a tie is a draw); otherwise the round
+ends when only one player has lives left. The winner gets +1 on the
+scoreboard.
+
+**Bugs & Blink-break** — during a round, bugs occasionally drift across
+your own camera feed. Open and close your mouth over one to eat it and earn
+a Blink-break (up to 3 stored). Activate one by puckering your lips, or
+tapping the button in the control bar: for 5 seconds, blinks and
+eyes-not-detected don't cost you a life, shown to everyone as a "BLINK
+BREAK" countdown on your tile.
+
+**Sunglasses photo** — sunglasses also drift across your feed. Line them up
+over both eyes and blink to take a photo: a camera-shutter sound plays for
+everyone, and every other player still in the round loses a life. Blinking
+without the glasses covering your eyes just costs you a life, same as
+normal. The glasses disappear as soon as they're used, and reappear later.
+
+**Mouth moments** — opening your mouth at any point during a round takes a
+small snapshot of your face, shared with the room. After the round, these
+play as a looping slideshow in the lobby until the next round starts.
+
+**Bug Hunt** — a 60-second lobby mini-game (not part of a round), started
+by anyone from the lobby. Bugs appear in the same place on everyone's
+screen at the same time — first to eat one claims it. Most bugs eaten wins
+the scoreboard point.
+
+**Solo practice pages**
+
+- `/?game=bugs` — a 60-second solo Bug Hunt, no room needed, to practice
+  eating bugs. Saves your best score on that device.
+- `/?tune` — live tuning page: sliders for every detection threshold
+  (blink, mouth, eyebrow, pucker) and every bug/sunglasses timing and size
+  value, with live face readings and a chomp/eye-cover visualizer. Values
+  are saved per browser — "Copy settings" puts them on the clipboard to
+  send over as new defaults.
+
+**Not yet built**: Spot the Real Stream, Poker Face, Simon Says, Face
+Race, and an actual mode-select screen (there's only one real mode, so
+nothing to pick between yet) — see `PLANNING.md` for the state of each.
+
 ## Structure
 
 - `apps/web` — React + Vite frontend. Video/audio via [LiveKit](https://livekit.io/).

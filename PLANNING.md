@@ -2,6 +2,13 @@
 
 Target: playable live demo at a games developer meetup, 3 weeks from project start.
 
+> **This is the design-decisions and roadmap doc — the "why" and "what's
+> next."** For current, accurate gameplay (the "how it plays right now"),
+> see [README.md](./README.md)'s "How to play" section instead; update that
+> one alongside any gameplay change so it doesn't go stale the way this
+> file's mode descriptions did. For day-to-day task status, see the
+> [GitHub Project board](https://github.com/users/bobatron/projects/2).
+
 ## Architecture
 
 - **Frontend** (`apps/web`): React + Vite SPA, deployed free on Vercel/Netlify,
@@ -42,46 +49,34 @@ crowns one overall winner at the end (Jackbox-style) — no re-joining
 between rounds. Tone throughout is goofy and chaotic, not tense/competitive.
 Works whether the room has 2 or 8+ players.
 
-Mini-games, roughly in priority order:
+Mini-games, roughly in priority order. **For what's actually built and how
+it currently plays, see the README's "How to play" section — that's the
+living reference, updated with every gameplay change. This list stays as
+the prioritized backlog and design-decision history.**
 
-1. **Staring Contest** (core, fully designed — see below).
-2. **Spot the Real Stream** (idea captured, not yet designed in depth — see
-   below).
+1. **Staring Contest** (built — see README). Key decisions, for the record:
+   free-for-all rather than paired duels (matches the "whole room watches
+   whole room" party vibe better than 1v1 duels); elimination triggers on
+   **either eye closing**, not just a synchronized two-eye blink, fixed
+   2026-09-20 after winking-to-dodge was flagged as an actual cheat vector
+   in testing; no artificial round-pacing — it runs as long as it naturally
+   takes. Since then it's grown lives (not single-hit), a round timer,
+   sunglasses/photos, bugs/blink-break, and mouth-moment snapshots — all in
+   the README, not duplicated here.
+2. **Spot the Real Stream** (idea captured, not yet built): a photo of the
+   spotlighted player is taken; every other tile shows that still (decoy
+   count scales with room size); one tile is the real live feed; everyone
+   else votes collectively, majority wins. Selection method, timing, and
+   scoring are still undecided.
 3. **Poker Face** (idea only, not yet designed) — a player privately sees a
    stimulus and must not react (smile/eyebrow raise/mouth open) while
    everyone watches.
 4. **Simon Says (Faces)** (idea only, not yet designed) — rapid-fire face
-   commands with increasing speed; mistakes eliminate.
+   commands with increasing speed; mistakes eliminate. Note: wink detection
+   proved unreliable in testing (see issue #14), so this mode's command set
+   may need to avoid relying on it.
 5. **Face Race** (idea only, not yet designed) — first player to match a
    target expression scores a point; low-downtime filler round.
-
-### Staring Contest
-
-- **Free-for-all**, not paired duels: everyone stares into their own camera
-  at once; whoever the camera catches blinking first is out. Last player
-  remaining wins the round.
-- Elimination triggers on **either eye closing**, not just a synchronized
-  two-eye blink — closing one eye at a time (winking) doesn't dodge
-  detection. Fixed 2026-09-20 after this was flagged as an actual cheat
-  vector in testing.
-- No artificial pacing mechanism — the round runs as long as it naturally
-  takes; no timers or escalating difficulty.
-- The "BLUNK!" moment is a big, silly spectacle: freeze-frame + zoom on the
-  culprit's face, combined with a whole-room effect (e.g. screen shake,
-  graphics), a loud sound, and a big animated stamp.
-- Eliminated players simply spectate and cheer — no active taunting
-  mechanic.
-
-### Spot the Real Stream
-
-- A photo of the spotlighted player is taken at the start of the round.
-- Every other player's tile displays that still image (decoys); one tile is
-  the spotlighted player's real live feed. Decoy count scales with room
-  size (one decoy per non-spotlighted player), not a fixed number.
-- All other players vote collectively; the majority vote is the single
-  final answer, not scored per individual guesser.
-- Selection method for who gets spotlighted, timing, and exact scoring are
-  still undecided — to be designed when this mode comes up for build.
 
 ## Roadmap
 
