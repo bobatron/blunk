@@ -11,8 +11,17 @@ import { fakeRoom } from "./fakeRoom.ts";
 // being loaded (normally done once, by app.ts, in the real server) need
 // loading here too, or startRegisteredMode would have nothing to call.
 import "../src/rounds.ts";
-import "../src/bug-hunt.ts";
-import "../src/spot-stream.ts";
+import { cancelBugHunt } from "../src/bug-hunt.ts";
+import { cancelSpotStream } from "../src/spot-stream.ts";
+
+/** A real started mode (bug-hunt, spot-stream) is driven by its own real
+ * timers, same as in production. These tests only care that the right mode
+ * started, so once that's confirmed, cancel it immediately rather than
+ * actually waiting out its real timers. */
+function settle(room: ReturnType<typeof fakeRoom>["room"]): void {
+  cancelBugHunt(room);
+  cancelSpotStream(room);
+}
 
 function voting(room: ReturnType<typeof fakeRoom>["room"]) {
   // unref() so a test that never drives this to resolution (and so never
@@ -33,6 +42,7 @@ test("resolveVote picks the only mode voted for, and starts it", () => {
   const resolved = sent.A.find((m) => m.type === "voting-resolved");
   assert.equal(resolved.mode, "staring");
   assert.ok(sent.A.some((m) => m.type === "round-started"), "the winning mode should actually start");
+  settle(room);
 });
 
 test("resolveVote picks randomly among tied modes", () => {
@@ -48,6 +58,7 @@ test("resolveVote picks randomly among tied modes", () => {
     // The winner should have actually started, not just been announced.
     if (resolved.mode === "staring") assert.equal(room.roundActive, true);
     else assert.notEqual(room.bugHunt, null);
+    settle(room);
   }
   assert.deepEqual([...seen].sort(), ["bug-hunt", "staring"]);
 });
@@ -58,6 +69,7 @@ test("resolveVote picks a random mode when no votes were cast at all", () => {
   resolveVote(room);
   const resolved = sent.A.find((m) => m.type === "voting-resolved");
   assert.ok(MODE_KEYS.includes(resolved.mode));
+  settle(room);
 });
 
 test("beginVoting does nothing in a custom-rules lobby", () => {

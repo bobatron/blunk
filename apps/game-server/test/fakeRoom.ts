@@ -5,7 +5,14 @@ import type { Room, RoomType } from "../src/rooms.ts";
 
 export function fakeRoom(
   playerIds: string[],
-  roomType: RoomType | null = "random",
+  // Defaults to null (behaves like "custom"), NOT "random" — a "random"
+  // room's modes auto-chain into a fresh real vote the instant one of them
+  // ends via its own real timer, which is the whole point of that lobby type
+  // in production, but means a test that forgets to tear the room down ends
+  // up really waiting out a live game loop. Pass "random" explicitly only in
+  // a test that's deliberately exercising that chaining, and cancel what it
+  // started (cancelBugHunt / cancelSpotStream) once the assertion is made.
+  roomType: RoomType | null = null,
 ): { room: Room; sent: Record<string, any[]> } {
   const sent: Record<string, any[]> = {};
   const players = new Map();
