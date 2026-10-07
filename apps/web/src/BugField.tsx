@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { FaceSignalsDetector } from "./face-signals/FaceSignalsDetector";
-import type { HuntBug } from "./game-server/context";
+import type { HuntBug } from "./game-server/gameState";
 import { getTuning } from "./tuning";
 import { toLayerPx } from "./layerMath";
 import { playChomp } from "./sounds";

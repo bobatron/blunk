@@ -10,6 +10,6 @@
     "dev:server": "npm run dev --workspace game-server",
     "build": "npm run build --workspace web && npm run build --workspace game-server",
     "lint": "npm run lint --workspace web && npm run lint --workspace game-server",
-    "test": "npm test --workspace game-server"
+    "test": "npm test --workspace web && npm test --workspace game-server"
   }
 }
