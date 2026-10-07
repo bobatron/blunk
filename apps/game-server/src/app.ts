@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:http";
 import { randomUUID } from "node:crypto";
 import { WebSocketServer } from "ws";
-import { getOrCreateRoom, broadcastLobby, removeRoom, type Room } from "./rooms.js";
+import { getOrCreateRoom, broadcastLobby, removeRoom, type Room, type RoomType } from "./rooms.js";
 import {
   eliminate,
   checkRoundEnd,
@@ -17,6 +17,14 @@ import {
 import { handleStartBugHunt, handleBugClaim, cancelBugHunt } from "./bug-hunt.js";
 import { handleSnapshot } from "./snapshots.js";
 import { mintLiveKitToken } from "./token.js";
+import { beginVoting, handleCastVote, cancelVote } from "./voting.js";
+import {
+  handleStartSpotStream,
+  handleSpotStreamFrame,
+  handleSpotStreamVote,
+  voidSpotStream,
+  cancelSpotStream,
+} from "./spot-stream.js";
 
 // --- HTTP + WebSocket server ------------------------------------------------
 // Both share one port so there's a single Fly.io service to expose.
@@ -86,7 +94,11 @@ export function createApp(): Server {
 
       switch (message.type) {
         case "join-room": {
-          const room = getOrCreateRoom(message.roomId);
+          // Only applied when the room doesn't exist yet — whoever's first
+          // in decides whether it's a "random games" or "custom rules" lobby.
+          const requestedType: RoomType | undefined =
+            message.roomType === "random" || message.roomType === "custom" ? message.roomType : undefined;
+          const room = getOrCreateRoom(message.roomId, requestedType);
           playerId = randomUUID();
           joinedRoom = room;
           room.players.set(playerId, { id: playerId, name: message.name ?? "Player", socket });
@@ -99,8 +111,10 @@ export function createApp(): Server {
           if (joinedRoom) handleSetConfig(joinedRoom, message);
           break;
 
+        // Manual mode starts are a "custom rules" thing — "random games"
+        // lobbies only ever get here by winning a vote.
         case "start-round":
-          if (joinedRoom && playerId) handleStartRound(joinedRoom, playerId, socket);
+          if (joinedRoom && playerId && joinedRoom.roomType !== "random") handleStartRound(joinedRoom, socket);
           break;
 
         // Eye closure (either eye) from the client's face detection.
@@ -126,7 +140,7 @@ export function createApp(): Server {
           break;
 
         case "start-bug-hunt":
-          if (joinedRoom && playerId) handleStartBugHunt(joinedRoom);
+          if (joinedRoom && playerId && joinedRoom.roomType !== "random") handleStartBugHunt(joinedRoom);
           break;
 
         case "bug-claim":
@@ -135,6 +149,31 @@ export function createApp(): Server {
 
         case "round-snapshot":
           if (joinedRoom && playerId) handleSnapshot(joinedRoom, playerId, message.image);
+          break;
+
+        // Starts (or, after a mode ends, re-starts) the 20s mode vote in a
+        // "random games" lobby. Nothing starts this automatically on room
+        // creation — the first players in choose when to kick it off.
+        case "start-voting":
+          if (joinedRoom && playerId) beginVoting(joinedRoom, socket);
+          break;
+
+        case "cast-vote":
+          if (joinedRoom && playerId) handleCastVote(joinedRoom, playerId, message.mode);
+          break;
+
+        // Manual trigger, "custom rules" lobbies only — in "random games"
+        // lobbies Spot the Real Stream is reached only by winning a vote.
+        case "start-spot-stream":
+          if (joinedRoom && playerId && joinedRoom.roomType !== "random") handleStartSpotStream(joinedRoom, socket);
+          break;
+
+        case "spot-stream-frame":
+          if (joinedRoom && playerId) handleSpotStreamFrame(joinedRoom, playerId, message.image);
+          break;
+
+        case "spot-stream-vote":
+          if (joinedRoom && playerId) handleSpotStreamVote(joinedRoom, playerId, message.box);
           break;
 
         default:
@@ -150,10 +189,16 @@ export function createApp(): Server {
           room.lives.set(playerId, 0);
           eliminate(room, playerId);
         }
+        // The model vanishing mid-Spot-the-Real-Stream voids the round —
+        // there's no feed left to judge. A judge dropping just shrinks the
+        // denominator everyone else is already being compared against.
+        if (room.spotStream?.modelId === playerId) voidSpotStream(room);
         room.players.delete(playerId);
         if (room.players.size === 0) {
           cancelBugHunt(room);
           cancelRoundTimer(room);
+          cancelVote(room);
+          cancelSpotStream(room);
           removeRoom(room.id);
         } else {
           checkRoundEnd(room);

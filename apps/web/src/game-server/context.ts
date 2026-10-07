@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import type { RoomConfig } from "./GameServerConnection";
+import type { ModeKey, RoomConfig } from "./GameServerConnection";
 import type { GameState } from "./gameState";
 
 export interface GameServerActions {
@@ -14,6 +14,11 @@ export interface GameServerActions {
   startBugHunt: () => void;
   claimBug: (bugId: number) => void;
   sendSnapshot: (image: string) => void;
+  startVoting: () => void;
+  castVote: (mode: ModeKey) => void;
+  startSpotStream: () => void;
+  sendSpotStreamFrame: (image: string) => void;
+  castSpotStreamVote: (box: number) => void;
 }
 
 /** Everything useGameServer() returns: the reducer-owned data, plus actions

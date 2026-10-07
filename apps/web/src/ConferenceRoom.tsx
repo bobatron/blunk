@@ -7,8 +7,19 @@ import { LocalFaceSignals } from "./LocalFaceSignals";
 import { StaringContest } from "./StaringContest";
 import { Lobby } from "./Lobby";
 import { GameGrid } from "./GameGrid";
+import { SpotStream } from "./SpotStream";
 import { ControlBar } from "./ControlBar";
+import { useGameServer } from "./game-server/useGameServer";
 import "./ConferenceRoom.css";
+
+/** The normal always-visible camera grid, except during Spot the Real
+ * Stream, which replaces it with the model/decoy-box view. */
+function MainStage() {
+  const { spotStream } = useGameServer();
+  // Keyed by modelId so a new round remounts fresh — local vote/flash state
+  // resets without needing an effect for it.
+  return spotStream ? <SpotStream key={spotStream.modelId} /> : <GameGrid />;
+}
 
 // Module-level so LiveKit doesn't see a new options object each render.
 const ROOM_OPTIONS: RoomOptions = {
@@ -25,6 +36,7 @@ export function ConferenceRoom({
   token,
   audioEnabled,
   videoEnabled,
+  roomType,
   onLeave,
 }: Props) {
   return (
@@ -38,13 +50,13 @@ export function ConferenceRoom({
       onDisconnected={onLeave}
       className="room-layout"
     >
-      <GameServerProvider roomName={roomName} participantName={participantName}>
+      <GameServerProvider roomName={roomName} participantName={participantName} roomType={roomType}>
         <LocalFaceSignals>
           <div className="room-header">
             <Lobby />
             <StaringContest />
           </div>
-          <GameGrid />
+          <MainStage />
           <ControlBar />
         </LocalFaceSignals>
         <RoomAudioRenderer />

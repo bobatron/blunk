@@ -119,3 +119,42 @@
 .solo-link {
   text-align: center;
 }
+
+.room-type-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.room-type-choice h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.room-type-choice .hint {
+  margin: 0;
+}
+
+.room-type-choice .choice-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.room-type-choice .choice {
+  font-family: var(--heading);
+  font-size: 14px;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.room-type-choice .choice.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}

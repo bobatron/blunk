@@ -1,5 +1,6 @@
 import type { Room } from "./rooms.js";
-import { broadcast, broadcastLobby } from "./rooms.js";
+import { broadcast, broadcastLobby, roomIsIdle } from "./rooms.js";
+import { registerModeStarter, notifyModeEnded } from "./hooks.js";
 
 export const BUG_HUNT_MS = 60000;
 const HUNT_BUG_LIFETIME_MS = 4000;
@@ -74,6 +75,7 @@ export function endBugHunt(room: Room): void {
   room.bugHunt = null;
   broadcast(room, { type: "bug-hunt-over", results });
   broadcastLobby(room);
+  notifyModeEnded(room);
 }
 
 /** Cancels a Bug Hunt without the usual "it's over" broadcast — for cleanup
@@ -87,7 +89,7 @@ export function cancelBugHunt(room: Room): void {
 }
 
 export function handleStartBugHunt(room: Room): void {
-  if (room.roundActive || room.bugHunt) return;
+  if (!roomIsIdle(room)) return;
   const endsAt = Date.now() + BUG_HUNT_MS;
   room.bugHunt = {
     endsAt,
@@ -113,3 +115,5 @@ export function handleBugClaim(room: Room, playerId: string, bugId: number): voi
   broadcast(room, { type: "bug-claimed", bugId: bug.id, playerId });
   broadcast(room, { type: "bug-hunt-scores", eaten: Object.fromEntries(room.bugHunt.eaten) });
 }
+
+registerModeStarter("bug-hunt", handleStartBugHunt);

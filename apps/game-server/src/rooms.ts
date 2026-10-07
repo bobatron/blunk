@@ -1,5 +1,7 @@
 import type { WebSocket } from "ws";
 import type { BugHunt } from "./bug-hunt.js";
+import type { VoteState } from "./voting.js";
+import type { SpotStreamState } from "./spot-stream.js";
 
 export interface Player {
   id: string;
@@ -13,8 +15,15 @@ export interface Config {
   timeLimitSec: number | null;
 }
 
+/** "random": the lobby votes on the next mode, defaults only, no manual
+ * config. "custom": today's original flow — pick a mode manually, configure
+ * it, start it whenever. Decided once by whoever's first into a fresh room;
+ * everyone who joins after inherits it. */
+export type RoomType = "custom" | "random";
+
 export interface Room {
   id: string;
+  roomType: RoomType | null;
   players: Map<string, Player>;
   roundActive: boolean;
   config: Config;
@@ -25,6 +34,8 @@ export interface Room {
   blinkBreakUntil: Map<string, number>;
   roundTimer: NodeJS.Timeout | null;
   bugHunt: BugHunt | null;
+  vote: VoteState | null;
+  spotStream: SpotStreamState | null;
   snapshotCount: Map<string, number>;
   lastSnapshotAt: Map<string, number>;
 }
@@ -35,11 +46,12 @@ export const TIME_OPTIONS: (number | null)[] = [30, 60, 90, 120, null];
 
 const rooms = new Map<string, Room>();
 
-export function getOrCreateRoom(roomId: string): Room {
+export function getOrCreateRoom(roomId: string, roomType?: RoomType): Room {
   let room = rooms.get(roomId);
   if (!room) {
     room = {
       id: roomId,
+      roomType: roomType ?? null,
       players: new Map(),
       roundActive: false,
       config: { ...DEFAULT_CONFIG },
@@ -49,6 +61,8 @@ export function getOrCreateRoom(roomId: string): Room {
       blinkBreakUntil: new Map(),
       roundTimer: null,
       bugHunt: null,
+      vote: null,
+      spotStream: null,
       snapshotCount: new Map(),
       lastSnapshotAt: new Map(),
     };
@@ -73,6 +87,7 @@ export function broadcast(room: Room, message: unknown): void {
 export function lobbyState(room: Room) {
   return {
     type: "lobby-state",
+    roomType: room.roomType,
     players: [...room.players.values()].map((p) => ({
       id: p.id,
       name: p.name,
@@ -86,4 +101,10 @@ export function lobbyState(room: Room) {
 
 export function broadcastLobby(room: Room): void {
   broadcast(room, lobbyState(room));
+}
+
+/** Is anything actually using the room right now — a round, Bug Hunt, Spot
+ * the Real Stream, or a vote in progress? Used to gate starting a new one. */
+export function roomIsIdle(room: Room): boolean {
+  return !room.roundActive && !room.bugHunt && !room.vote && !room.spotStream;
 }

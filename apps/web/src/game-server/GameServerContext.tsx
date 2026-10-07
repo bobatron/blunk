@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, type ReactNode } from "react";
-import { GameServerConnection } from "./GameServerConnection";
+import { GameServerConnection, type RoomType } from "./GameServerConnection";
 import { GAME_SERVER_URL } from "../config";
 import { GameServerContext, type GameServerState } from "./context";
 import { gameReducer } from "./gameReducer";
@@ -8,24 +8,27 @@ import { initialGameState } from "./gameState";
 export function GameServerProvider({
   roomName,
   participantName,
+  roomType,
   children,
 }: {
   roomName: string;
   participantName: string;
+  /** Only meaningful the first time this room is created — see rooms.ts's getOrCreateRoom. */
+  roomType?: RoomType;
   children: ReactNode;
 }) {
   const connectionRef = useRef<GameServerConnection | null>(null);
   const [state, dispatch] = useReducer(gameReducer, initialGameState);
 
   useEffect(() => {
-    const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName);
+    const connection = new GameServerConnection(GAME_SERVER_URL, roomName, participantName, roomType);
     connectionRef.current = connection;
     const timers: ReturnType<typeof setTimeout>[] = [];
 
     const unsubs = [
       connection.on("joined", ({ playerId }) => dispatch({ type: "joined", playerId })),
-      connection.on("lobby-state", ({ players, roundActive, config }) =>
-        dispatch({ type: "lobby-state", players, roundActive, config }),
+      connection.on("lobby-state", ({ players, roundActive, config, roomType }) =>
+        dispatch({ type: "lobby-state", players, roundActive, config, roomType }),
       ),
       connection.on("round-started", ({ endsAt }) => dispatch({ type: "round-started", endsAt })),
       connection.on("life-lost", ({ playerId, livesLeft, reason }) =>
@@ -57,6 +60,23 @@ export function GameServerProvider({
       connection.on("round-snapshot", ({ playerId, image }) =>
         dispatch({ type: "round-snapshot", playerId, image }),
       ),
+      connection.on("voting-started", ({ endsAt, modes }) => dispatch({ type: "voting-started", endsAt, modes })),
+      connection.on("vote-cast", ({ voteCount }) => dispatch({ type: "vote-cast", voteCount })),
+      connection.on("voting-resolved", ({ mode }) => dispatch({ type: "voting-resolved", mode })),
+      connection.on("spot-stream-started", ({ modelId, poseEndsAt }) =>
+        dispatch({ type: "spot-stream-started", modelId, poseEndsAt }),
+      ),
+      connection.on("spot-stream-flash", () => dispatch({ type: "spot-stream-flash" })),
+      connection.on("spot-stream-voting", ({ frame, boxCount, liveBoxIndex, votingEndsAt }) =>
+        dispatch({ type: "spot-stream-voting", frame, boxCount, liveBoxIndex, votingEndsAt }),
+      ),
+      connection.on("spot-stream-vote-cast", ({ voteCount }) =>
+        dispatch({ type: "spot-stream-vote-cast", voteCount }),
+      ),
+      connection.on("spot-stream-over", ({ modelId, liveBoxIndex, judgeVotes, awards }) =>
+        dispatch({ type: "spot-stream-over", modelId, liveBoxIndex, judgeVotes, awards }),
+      ),
+      connection.on("spot-stream-voided", () => dispatch({ type: "spot-stream-voided" })),
       connection.on("error", ({ message }) => dispatch({ type: "error", message })),
     ];
 
@@ -65,6 +85,9 @@ export function GameServerProvider({
       timers.forEach(clearTimeout);
       connection.close();
     };
+    // roomType is only applied the moment a fresh room is created server-side —
+    // it's not meant to trigger a reconnect if it somehow changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomName, participantName]);
 
   const value: GameServerState = {
@@ -80,6 +103,11 @@ export function GameServerProvider({
     startBugHunt: () => connectionRef.current?.startBugHunt(),
     claimBug: (bugId) => connectionRef.current?.claimBug(bugId),
     sendSnapshot: (image) => connectionRef.current?.sendSnapshot(image),
+    startVoting: () => connectionRef.current?.startVoting(),
+    castVote: (mode) => connectionRef.current?.castVote(mode),
+    startSpotStream: () => connectionRef.current?.startSpotStream(),
+    sendSpotStreamFrame: (image) => connectionRef.current?.sendSpotStreamFrame(image),
+    castSpotStreamVote: (box) => connectionRef.current?.castSpotStreamVote(box),
   };
 
   return <GameServerContext.Provider value={value}>{children}</GameServerContext.Provider>;

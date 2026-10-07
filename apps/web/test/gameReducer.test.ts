@@ -20,14 +20,27 @@ test("joined sets the player id", () => {
 test("lobby-state updates players and accumulates playerNames, even across departures", () => {
   const s1 = gameReducer(
     initialGameState,
-    { type: "lobby-state", players: [{ id: "a", name: "Alice", lives: 3, powerups: 0 }], roundActive: false, config: { lives: 3, timeLimitSec: 90 } },
+    {
+      type: "lobby-state",
+      players: [{ id: "a", name: "Alice", lives: 3, powerups: 0 }],
+      roundActive: false,
+      config: { lives: 3, timeLimitSec: 90 },
+      roomType: "random",
+    },
   );
   assert.deepEqual(s1.playerNames, { a: "Alice" });
+  assert.equal(s1.roomType, "random");
 
   // Alice leaves, Bob joins — playerNames keeps Alice even though players doesn't.
   const s2 = gameReducer(
     s1,
-    { type: "lobby-state", players: [{ id: "b", name: "Bob", lives: 3, powerups: 0 }], roundActive: false, config: { lives: 3, timeLimitSec: 90 } },
+    {
+      type: "lobby-state",
+      players: [{ id: "b", name: "Bob", lives: 3, powerups: 0 }],
+      roundActive: false,
+      config: { lives: 3, timeLimitSec: 90 },
+      roomType: "random",
+    },
   );
   assert.deepEqual(s2.players, [{ id: "b", name: "Bob", lives: 3, powerups: 0 }]);
   assert.deepEqual(s2.playerNames, { a: "Alice", b: "Bob" });
@@ -212,4 +225,116 @@ test("bug-hunt-over ranks results and awards the top eater, unless it's a tie or
 test("error records the message", () => {
   const next = gameReducer(initialGameState, { type: "error", message: "nope" });
   assert.equal(next.errorMessage, "nope");
+});
+
+test("voting-started opens a vote and clears any prior resolved-mode announcement", () => {
+  const prior = state({ votingResolvedMode: "bug-hunt" });
+  const next = gameReducer(prior, { type: "voting-started", endsAt: 9000, modes: ["staring", "bug-hunt"] });
+  assert.deepEqual(next.vote, { endsAt: 9000, modes: ["staring", "bug-hunt"], voteCount: 0 });
+  assert.equal(next.votingResolvedMode, null);
+});
+
+test("vote-cast updates the tally, and is a no-op with no vote in progress", () => {
+  const voting = state({ vote: { endsAt: 9000, modes: ["staring"], voteCount: 0 } });
+  const next = gameReducer(voting, { type: "vote-cast", voteCount: 2 });
+  assert.equal(next.vote?.voteCount, 2);
+
+  const noVote = gameReducer(initialGameState, { type: "vote-cast", voteCount: 2 });
+  assert.equal(noVote, initialGameState);
+});
+
+test("voting-resolved clears the vote and announces the winning mode", () => {
+  const voting = state({ vote: { endsAt: 9000, modes: ["staring"], voteCount: 1 } });
+  const next = gameReducer(voting, { type: "voting-resolved", mode: "spot-stream" });
+  assert.equal(next.vote, null);
+  assert.equal(next.votingResolvedMode, "spot-stream");
+});
+
+test("round-started and bug-hunt-started clear a resolved-mode announcement once the mode actually starts", () => {
+  const afterStaring = gameReducer(state({ votingResolvedMode: "staring" }), { type: "round-started", endsAt: null });
+  assert.equal(afterStaring.votingResolvedMode, null);
+
+  const afterBugHunt = gameReducer(state({ votingResolvedMode: "bug-hunt" }), {
+    type: "bug-hunt-started",
+    endsAt: 1000,
+    serverNow: 0,
+    now: 0,
+  });
+  assert.equal(afterBugHunt.votingResolvedMode, null);
+});
+
+test("spot-stream-started opens posing phase and clears the last result", () => {
+  const prior = state({ spotStreamResult: { modelId: "a", liveBoxIndex: 0, judgeVotes: [], awards: [] } });
+  const next = gameReducer(prior, { type: "spot-stream-started", modelId: "a", poseEndsAt: 5000 });
+  assert.deepEqual(next.spotStream, {
+    modelId: "a",
+    phase: "posing",
+    poseEndsAt: 5000,
+    frame: null,
+    boxCount: 0,
+    liveBoxIndex: null,
+    votingEndsAt: null,
+    voteCount: 0,
+  });
+  assert.equal(next.spotStreamResult, null);
+});
+
+test("spot-stream-flash only bumps the capture key", () => {
+  const posing = state({ spotStream: { modelId: "a", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
+  const next = gameReducer(posing, { type: "spot-stream-flash" });
+  assert.equal(next.spotStreamFlashKey, 1);
+  assert.equal(next.spotStream?.phase, "posing");
+});
+
+test("spot-stream-voting moves to the voting phase with the decoy grid details", () => {
+  const posing = state({ spotStream: { modelId: "a", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
+  const next = gameReducer(posing, {
+    type: "spot-stream-voting",
+    frame: "data:image/jpeg;base64,xx",
+    boxCount: 8,
+    liveBoxIndex: 3,
+    votingEndsAt: 9000,
+  });
+  assert.equal(next.spotStream?.phase, "voting");
+  assert.equal(next.spotStream?.frame, "data:image/jpeg;base64,xx");
+  assert.equal(next.spotStream?.liveBoxIndex, 3);
+});
+
+test("spot-stream-vote-cast updates the tally", () => {
+  const voting = state({ spotStream: { modelId: "a", phase: "voting", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 0, votingEndsAt: 1, voteCount: 0 } });
+  const next = gameReducer(voting, { type: "spot-stream-vote-cast", voteCount: 1 });
+  assert.equal(next.spotStream?.voteCount, 1);
+});
+
+test("spot-stream-over records the reveal and applies awards to the scoreboard", () => {
+  const prior = state({ scores: { model: 1 }, spotStream: { modelId: "model", phase: "voting", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 3, votingEndsAt: 1, voteCount: 2 } });
+  const next = gameReducer(prior, {
+    type: "spot-stream-over",
+    modelId: "model",
+    liveBoxIndex: 3,
+    judgeVotes: [
+      { playerId: "x", box: 3, correct: true },
+      { playerId: "y", box: 0, correct: false },
+    ],
+    awards: [{ playerId: "x", points: 3 }],
+  });
+  assert.equal(next.spotStream, null);
+  assert.deepEqual(next.spotStreamResult, {
+    modelId: "model",
+    liveBoxIndex: 3,
+    judgeVotes: [
+      { playerId: "x", box: 3, correct: true },
+      { playerId: "y", box: 0, correct: false },
+    ],
+    awards: [{ playerId: "x", points: 3 }],
+  });
+  assert.deepEqual(next.scores, { model: 1, x: 3 });
+});
+
+test("spot-stream-voided just clears the round, with no reveal and no score change", () => {
+  const prior = state({ scores: { model: 1 }, spotStream: { modelId: "model", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
+  const next = gameReducer(prior, { type: "spot-stream-voided" });
+  assert.equal(next.spotStream, null);
+  assert.equal(next.spotStreamResult, null);
+  assert.deepEqual(next.scores, { model: 1 });
 });

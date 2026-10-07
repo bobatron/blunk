@@ -29,6 +29,22 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
     gameRef.current = game;
   });
 
+  // The instant the flash goes off in Spot the Real Stream, the model's own
+  // client grabs a frame and sends it — everyone else just watches for the
+  // flash broadcast and the frame that follows.
+  useEffect(() => {
+    if (game.spotStreamFlashKey === 0) return;
+    if (game.spotStream?.modelId !== game.playerId) return;
+    const video = videoRef.current;
+    // Unmirrored: this still sits next to the model's own real, unmirrored
+    // remote tile in the decoy grid, and judges would spot the live box in
+    // an instant if the still were flipped relative to it.
+    const image = video ? captureFace(video, { mirror: false }) : null;
+    if (image) game.sendSpotStreamFrame(image);
+    // Only the key changing should trigger a capture, not every state change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.spotStreamFlashKey]);
+
   useEffect(() => {
     const track = cameraTrack?.track;
     const video = videoRef.current;

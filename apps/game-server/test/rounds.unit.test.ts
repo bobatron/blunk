@@ -25,6 +25,7 @@ function fakeRoom(lives: Record<string, number>): { room: Room; sent: Record<str
   }
   const room: Room = {
     id: "fake",
+    roomType: null,
     players,
     roundActive: true,
     config: { lives: 3, timeLimitSec: null },
@@ -34,6 +35,8 @@ function fakeRoom(lives: Record<string, number>): { room: Room; sent: Record<str
     blinkBreakUntil: new Map(),
     roundTimer: null,
     bugHunt: null,
+    vote: null,
+    spotStream: null,
     snapshotCount: new Map(),
     lastSnapshotAt: new Map(),
   };

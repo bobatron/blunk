@@ -1,4 +1,12 @@
-import type { LobbyPlayer, RoomConfig, ServerBug } from "./GameServerConnection";
+import type {
+  LobbyPlayer,
+  ModeKey,
+  RoomConfig,
+  RoomType,
+  ServerBug,
+  SpotStreamAward,
+  SpotStreamJudgeVote,
+} from "./GameServerConnection";
 import type { GameState, HuntBug } from "./gameState";
 
 /** One event per message the game-server can send, plus two synthetic ones
@@ -8,7 +16,13 @@ import type { GameState, HuntBug } from "./gameState";
  * itself) so the reducer stays a pure function of (state, event). */
 export type GameEvent =
   | { type: "joined"; playerId: string }
-  | { type: "lobby-state"; players: LobbyPlayer[]; roundActive: boolean; config: RoomConfig }
+  | {
+      type: "lobby-state";
+      players: LobbyPlayer[];
+      roundActive: boolean;
+      config: RoomConfig;
+      roomType: RoomType | null;
+    }
   | { type: "round-started"; endsAt: number | null }
   | { type: "life-lost"; playerId: string; livesLeft: number; reason: "eye-closed" | "eyes-missing" | "photo" }
   | { type: "photo-taken"; playerId: string }
@@ -22,6 +36,21 @@ export type GameEvent =
   | { type: "bug-hunt-scores"; eaten: Record<string, number> }
   | { type: "bug-hunt-over"; results: { playerId: string; eaten: number }[] }
   | { type: "round-snapshot"; playerId: string; image: string }
+  | { type: "voting-started"; endsAt: number; modes: ModeKey[] }
+  | { type: "vote-cast"; voteCount: number }
+  | { type: "voting-resolved"; mode: ModeKey }
+  | { type: "spot-stream-started"; modelId: string; poseEndsAt: number }
+  | { type: "spot-stream-flash" }
+  | { type: "spot-stream-voting"; frame: string; boxCount: number; liveBoxIndex: number; votingEndsAt: number }
+  | { type: "spot-stream-vote-cast"; voteCount: number }
+  | {
+      type: "spot-stream-over";
+      modelId: string;
+      liveBoxIndex: number;
+      judgeVotes: SpotStreamJudgeVote[];
+      awards: SpotStreamAward[];
+    }
+  | { type: "spot-stream-voided" }
   | { type: "error"; message: string }
   | { type: "dismiss-reel" };
 
@@ -33,7 +62,14 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
     case "lobby-state": {
       const playerNames = { ...state.playerNames };
       for (const p of event.players) playerNames[p.id] = p.name;
-      return { ...state, players: event.players, roundActive: event.roundActive, config: event.config, playerNames };
+      return {
+        ...state,
+        players: event.players,
+        roundActive: event.roundActive,
+        config: event.config,
+        roomType: event.roomType,
+        playerNames,
+      };
     }
 
     case "round-started":
@@ -46,6 +82,8 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         blinkBreaks: {},
         snapshots: [],
         reel: null,
+        votingResolvedMode: null,
+        spotStreamResult: null,
       };
 
     case "life-lost": {
@@ -119,6 +157,8 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         bugHunt: { endsAt: event.endsAt - clockOffset, eaten: {}, bugs: [] },
         bugHuntResults: null,
         huntClaim: null,
+        votingResolvedMode: null,
+        spotStreamResult: null,
       };
     }
 
@@ -160,6 +200,81 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
           : state.scores;
       return { ...state, bugHunt: null, bugHuntResults: ranked, scores };
     }
+
+    case "voting-started":
+      return {
+        ...state,
+        vote: { endsAt: event.endsAt, modes: event.modes, voteCount: 0 },
+        votingResolvedMode: null,
+      };
+
+    case "vote-cast":
+      if (!state.vote) return state;
+      return { ...state, vote: { ...state.vote, voteCount: event.voteCount } };
+
+    case "voting-resolved":
+      return { ...state, vote: null, votingResolvedMode: event.mode };
+
+    case "spot-stream-started":
+      return {
+        ...state,
+        spotStream: {
+          modelId: event.modelId,
+          phase: "posing",
+          poseEndsAt: event.poseEndsAt,
+          frame: null,
+          boxCount: 0,
+          liveBoxIndex: null,
+          votingEndsAt: null,
+          voteCount: 0,
+        },
+        spotStreamResult: null,
+        votingResolvedMode: null,
+      };
+
+    // No state change beyond the key bump — it just tells the model's
+    // client (via the key changing) that now's the moment to grab a frame.
+    case "spot-stream-flash":
+      return { ...state, spotStreamFlashKey: state.spotStreamFlashKey + 1 };
+
+    case "spot-stream-voting":
+      if (!state.spotStream) return state;
+      return {
+        ...state,
+        spotStream: {
+          ...state.spotStream,
+          phase: "voting",
+          frame: event.frame,
+          boxCount: event.boxCount,
+          liveBoxIndex: event.liveBoxIndex,
+          votingEndsAt: event.votingEndsAt,
+        },
+      };
+
+    case "spot-stream-vote-cast":
+      if (!state.spotStream) return state;
+      return { ...state, spotStream: { ...state.spotStream, voteCount: event.voteCount } };
+
+    case "spot-stream-over": {
+      const scores = event.awards.reduce(
+        (acc, a) => ({ ...acc, [a.playerId]: (acc[a.playerId] ?? 0) + a.points }),
+        state.scores,
+      );
+      return {
+        ...state,
+        spotStream: null,
+        spotStreamResult: {
+          modelId: event.modelId,
+          liveBoxIndex: event.liveBoxIndex,
+          judgeVotes: event.judgeVotes,
+          awards: event.awards,
+        },
+        scores,
+      };
+    }
+
+    case "spot-stream-voided":
+      return { ...state, spotStream: null };
 
     case "error":
       return { ...state, errorMessage: event.message };

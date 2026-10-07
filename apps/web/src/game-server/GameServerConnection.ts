@@ -4,11 +4,27 @@ export interface RoomConfig {
   timeLimitSec: number | null;
 }
 
+export type RoomType = "custom" | "random";
+
+/** Mirrors the game-server's hooks.ts — the modes a "random games" lobby can vote on. */
+export type ModeKey = "staring" | "bug-hunt" | "spot-stream";
+
 export interface LobbyPlayer {
   id: string;
   name: string;
   lives: number;
   powerups: number;
+}
+
+export interface SpotStreamJudgeVote {
+  playerId: string;
+  box: number;
+  correct: boolean;
+}
+
+export interface SpotStreamAward {
+  playerId: string;
+  points: number;
 }
 
 export interface PathPoint {
@@ -27,7 +43,12 @@ export interface ServerBug {
 
 export interface GameServerEvents {
   joined: (payload: { playerId: string; roomId: string }) => void;
-  "lobby-state": (payload: { players: LobbyPlayer[]; roundActive: boolean; config: RoomConfig }) => void;
+  "lobby-state": (payload: {
+    players: LobbyPlayer[];
+    roundActive: boolean;
+    config: RoomConfig;
+    roomType: RoomType | null;
+  }) => void;
   "round-started": (payload: { endsAt: number | null; lives: number }) => void;
   "life-lost": (payload: {
     playerId: string;
@@ -44,6 +65,26 @@ export interface GameServerEvents {
   "bug-hunt-scores": (payload: { eaten: Record<string, number> }) => void;
   "bug-hunt-over": (payload: { results: { playerId: string; eaten: number }[] }) => void;
   "round-snapshot": (payload: { playerId: string; image: string }) => void;
+  "voting-started": (payload: { endsAt: number; modes: ModeKey[]; serverNow: number }) => void;
+  "vote-cast": (payload: { playerId: string; voteCount: number }) => void;
+  "voting-resolved": (payload: { mode: ModeKey }) => void;
+  "spot-stream-started": (payload: { modelId: string; poseEndsAt: number; serverNow: number }) => void;
+  "spot-stream-flash": (payload: Record<string, never>) => void;
+  "spot-stream-voting": (payload: {
+    frame: string;
+    boxCount: number;
+    liveBoxIndex: number;
+    votingEndsAt: number;
+    serverNow: number;
+  }) => void;
+  "spot-stream-vote-cast": (payload: { playerId: string; voteCount: number }) => void;
+  "spot-stream-over": (payload: {
+    modelId: string;
+    liveBoxIndex: number;
+    judgeVotes: SpotStreamJudgeVote[];
+    awards: SpotStreamAward[];
+  }) => void;
+  "spot-stream-voided": (payload: Record<string, never>) => void;
   error: (payload: { message: string }) => void;
 }
 
@@ -63,10 +104,10 @@ export class GameServerConnection {
   private socket: WebSocket;
   private listeners = new Map<EventName, Set<(...args: never[]) => void>>();
 
-  constructor(gameServerUrl: string, roomId: string, name: string) {
+  constructor(gameServerUrl: string, roomId: string, name: string, roomType?: RoomType) {
     this.socket = new WebSocket(toWsUrl(gameServerUrl));
     this.socket.addEventListener("open", () => {
-      this.socket.send(JSON.stringify({ type: "join-room", roomId, name }));
+      this.socket.send(JSON.stringify({ type: "join-room", roomId, name, roomType }));
     });
     this.socket.addEventListener("message", (event) => {
       let message: { type: EventName; [key: string]: unknown };
@@ -135,6 +176,30 @@ export class GameServerConnection {
 
   sendSnapshot(image: string): void {
     this.send({ type: "round-snapshot", image });
+  }
+
+  /** Kicks off the 20s mode vote in a "random games" lobby. A no-op server
+   * side for a "custom rules" lobby. */
+  startVoting(): void {
+    this.send({ type: "start-voting" });
+  }
+
+  castVote(mode: ModeKey): void {
+    this.send({ type: "cast-vote", mode });
+  }
+
+  /** Manual trigger, "custom rules" lobbies only. */
+  startSpotStream(): void {
+    this.send({ type: "start-spot-stream" });
+  }
+
+  /** The model's own captured frame, sent the instant the flash goes off. */
+  sendSpotStreamFrame(image: string): void {
+    this.send({ type: "spot-stream-frame", image });
+  }
+
+  castSpotStreamVote(box: number): void {
+    this.send({ type: "spot-stream-vote", box });
   }
 
   close(): void {

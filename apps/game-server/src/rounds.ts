@@ -1,6 +1,7 @@
 import type { WebSocket } from "ws";
 import type { Room } from "./rooms.js";
-import { broadcast, broadcastLobby, LIVES_OPTIONS, TIME_OPTIONS } from "./rooms.js";
+import { broadcast, broadcastLobby, roomIsIdle, LIVES_OPTIONS, TIME_OPTIONS } from "./rooms.js";
+import { registerModeStarter, notifyModeEnded } from "./hooks.js";
 
 export const BLINK_BREAK_MS = 5000;
 export const MAX_POWERUPS = 3;
@@ -11,6 +12,7 @@ export function endRound(room: Room, winnerId: string | null): void {
   room.roundTimer = null;
   broadcast(room, { type: "round-over", winnerId });
   broadcastLobby(room);
+  notifyModeEnded(room);
 }
 
 export function cancelRoundTimer(room: Room): void {
@@ -65,6 +67,9 @@ export function endByTime(room: Room): void {
 
 export function handleSetConfig(room: Room, message: { lives?: unknown; timeLimitSec?: unknown }): void {
   if (room.roundActive) return;
+  // "Random games" lobbies only ever run on defaults — manual config is a
+  // "custom rules" lobby thing.
+  if (room.roomType === "random") return;
   const lives = Number(message.lives);
   const timeLimitSec = message.timeLimitSec === null ? null : Number(message.timeLimitSec);
   if (!LIVES_OPTIONS.includes(lives)) return;
@@ -73,14 +78,13 @@ export function handleSetConfig(room: Room, message: { lives?: unknown; timeLimi
   broadcastLobby(room);
 }
 
-export function handleStartRound(room: Room, playerId: string, socket: WebSocket): void {
-  if (room.roundActive) return;
-  if (room.bugHunt) {
-    socket.send(JSON.stringify({ type: "error", message: "Wait for the Bug Hunt to finish" }));
+export function handleStartRound(room: Room, socket?: WebSocket): void {
+  if (!roomIsIdle(room)) {
+    socket?.send(JSON.stringify({ type: "error", message: "Wait for the current game to finish" }));
     return;
   }
   if (room.players.size < 2) {
-    socket.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
+    socket?.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
     return;
   }
   room.roundActive = true;
@@ -132,3 +136,5 @@ export function handleUsePowerup(room: Room, playerId: string): void {
   broadcast(room, { type: "blink-break", playerId, until });
   broadcastLobby(room);
 }
+
+registerModeStarter("staring", handleStartRound);

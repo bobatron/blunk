@@ -1,4 +1,12 @@
-import type { LobbyPlayer, PathPoint, RoomConfig } from "./GameServerConnection";
+import type {
+  LobbyPlayer,
+  ModeKey,
+  PathPoint,
+  RoomConfig,
+  RoomType,
+  SpotStreamAward,
+  SpotStreamJudgeVote,
+} from "./GameServerConnection";
 
 export interface Elimination {
   playerId: string;
@@ -21,6 +29,32 @@ export interface HuntBug {
   path: PathPoint[];
 }
 
+/** A mode vote in progress, "random games" lobbies only. */
+export interface VoteUiState {
+  endsAt: number;
+  modes: ModeKey[];
+  voteCount: number;
+}
+
+/** Spot the Real Stream, in progress. */
+export interface SpotStreamUiState {
+  modelId: string;
+  phase: "posing" | "voting" | "reveal";
+  poseEndsAt: number | null;
+  frame: string | null;
+  boxCount: number;
+  liveBoxIndex: number | null;
+  votingEndsAt: number | null;
+  voteCount: number;
+}
+
+export interface SpotStreamResult {
+  modelId: string;
+  liveBoxIndex: number;
+  judgeVotes: SpotStreamJudgeVote[];
+  awards: SpotStreamAward[];
+}
+
 /** The data half of game state — everything the reducer owns. The action
  * functions (startRound, sendBlunk, ...) live alongside this in
  * GameServerState (context.ts), not here — they talk to the connection,
@@ -30,6 +64,9 @@ export interface GameState {
   players: LobbyPlayer[];
   /** Every player id/name seen this session, even ones who've since left. */
   playerNames: Record<string, string>;
+  /** Decided once, by whoever's first into a fresh room. Null until the
+   * first lobby-state arrives (or for a room an old client created). */
+  roomType: RoomType | null;
   config: RoomConfig;
   roundActive: boolean;
   /** Epoch ms when the round times out, or null for no time limit. */
@@ -53,6 +90,16 @@ export interface GameState {
   snapshots: { id: number; playerId: string; image: string }[];
   /** Snapshots from the round that just ended, played as a looping slideshow until the next round. */
   reel: { key: number; items: { id: number; playerId: string; image: string }[] } | null;
+  /** The mode vote currently running, "random games" lobbies only. */
+  vote: VoteUiState | null;
+  /** The mode that just won a vote — a brief announcement, cleared once that mode actually starts. */
+  votingResolvedMode: ModeKey | null;
+  /** Spot the Real Stream, in progress. */
+  spotStream: SpotStreamUiState | null;
+  /** Bumped on every "spot-stream-flash" — the model's client captures and sends a frame when this changes. */
+  spotStreamFlashKey: number;
+  /** The reveal from the last finished Spot the Real Stream round. */
+  spotStreamResult: SpotStreamResult | null;
   errorMessage: string | null;
   /** Server-clock to browser-clock offset, refreshed whenever the server sends a time. */
   clockOffset: number;
@@ -68,6 +115,7 @@ export const initialGameState: GameState = {
   playerId: null,
   players: [],
   playerNames: {},
+  roomType: null,
   config: DEFAULT_CONFIG,
   roundActive: false,
   roundEndsAt: null,
@@ -82,6 +130,11 @@ export const initialGameState: GameState = {
   bugHuntResults: null,
   snapshots: [],
   reel: null,
+  vote: null,
+  votingResolvedMode: null,
+  spotStream: null,
+  spotStreamFlashKey: 0,
+  spotStreamResult: null,
   errorMessage: null,
   clockOffset: 0,
   lifeKeyCounter: 0,

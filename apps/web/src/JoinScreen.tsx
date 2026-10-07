@@ -9,6 +9,8 @@ export interface JoinDetails {
   token: string;
   audioEnabled: boolean;
   videoEnabled: boolean;
+  /** Only takes effect the first time this room is created — see rooms.ts's getOrCreateRoom. */
+  roomType: "random" | "custom";
 }
 
 interface Props {
@@ -20,6 +22,7 @@ export function JoinScreen({ onJoined }: Props) {
   const [participantName, setParticipantName] = useState("");
   const [audioEnabled, setAudioEnabled] = useState(true);
   const [videoEnabled, setVideoEnabled] = useState(true);
+  const [roomType, setRoomType] = useState<"random" | "custom">("random");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previewRef = useRef<HTMLVideoElement>(null);
@@ -70,6 +73,7 @@ export function JoinScreen({ onJoined }: Props) {
         token,
         audioEnabled,
         videoEnabled,
+        roomType,
       });
     } catch (err) {
       setError((err as Error).message);
@@ -109,6 +113,27 @@ export function JoinScreen({ onJoined }: Props) {
             placeholder="lobby"
           />
         </label>
+
+        <div className="setting-group room-type-choice">
+          <h3>Lobby type</h3>
+          <p className="hint">Only matters if you're the first one into this room.</p>
+          <div className="choice-row">
+            <button
+              type="button"
+              className={`choice${roomType === "random" ? " selected" : ""}`}
+              onClick={() => setRoomType("random")}
+            >
+              Random games — vote on what's next
+            </button>
+            <button
+              type="button"
+              className={`choice${roomType === "custom" ? " selected" : ""}`}
+              onClick={() => setRoomType("custom")}
+            >
+              Custom rules — pick modes & settings yourself
+            </button>
+          </div>
+        </div>
 
         <div className="toggle-row">
           <button
