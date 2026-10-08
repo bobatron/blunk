@@ -60,9 +60,11 @@ export function SpotStream() {
   const isModel = playerId === stream.modelId;
   const modelTrackRef = tracks.find((t) => t.participant.identity === modelName);
   const modelTrack = modelTrackRef && isTrackReference(modelTrackRef) ? modelTrackRef : undefined;
-  // Mirrored only on the model's own screen (so posing feels like looking in
-  // a mirror, same as everywhere else in the app) — judges see it unmirrored,
-  // same as any other remote participant.
+  // Mirrored only on the model's own screen, and only while posing — like
+  // looking in a mirror while deciding how to move. Once the grid of boxes
+  // shows up, the model's own live box sits right next to several unmirrored
+  // decoy stills of their own face; mirroring it there would make it look
+  // flipped compared to its neighbors, on the model's screen specifically.
   const mirrorModel = modelTrack?.participant.isLocal ?? false;
 
   const poseLeft = stream.poseEndsAt ? Math.max(0, Math.ceil((stream.poseEndsAt - now) / 1000)) : 0;
@@ -76,7 +78,8 @@ export function SpotStream() {
 
   function renderBox(i: number) {
     if (i === stream.liveBoxIndex && modelTrack) {
-      return <VideoTrack trackRef={modelTrack} className={`spot-stream-video${mirrorModel ? " mirrored" : ""}`} />;
+      // Never mirrored here, even on the model's own screen — see mirrorModel's comment above.
+      return <VideoTrack trackRef={modelTrack} className="spot-stream-video" />;
     }
     if (stream.frame) return <img src={stream.frame} alt="" />;
     return null;

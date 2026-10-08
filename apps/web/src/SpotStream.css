@@ -47,11 +47,17 @@
 }
 
 /* Bare video, no LiveKit chrome (name/connection/camera icons) — those
-   icons would be an instant tell for which decoy box is the real feed. */
+   icons would be an instant tell for which decoy box is the real feed.
+   !important because @livekit/components-styles ships its own rule —
+   .lk-participant-media-video[data-lk-orientation=portrait] { object-fit:
+   contain } — which VideoTrack applies via a class on this same <video>
+   element, and wins on specificity on a phone held in portrait. That would
+   letterbox the live box while its decoy neighbors (plain <img>s) fill
+   completely, which is its own instant tell for which box is live. */
 .spot-stream-video {
-  height: 100%;
-  width: 100%;
-  object-fit: cover;
+  height: 100% !important;
+  width: 100% !important;
+  object-fit: cover !important;
   display: block;
 }
 
