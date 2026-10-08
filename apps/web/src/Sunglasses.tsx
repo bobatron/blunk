@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocalFace } from "./localFace";
 import { toLayerPx } from "./layerMath";
-import { bothEyesCovered, type GlassesPos } from "./glassesMath";
+import { bothEyesCovered, eyeGap, type GlassesPos } from "./glassesMath";
 import { getTuning } from "./tuning";
 import { useGameServer } from "./game-server/useGameServer";
 import "./Sunglasses.css";
@@ -32,11 +32,18 @@ export function Sunglasses() {
   const [sprite, setSprite] = useState<{ left: number; top: number; size: number } | null>(null);
   const glassesRef = useRef<Glasses | null>(null);
   const photosSeen = useRef(0);
+  // This player's own live eye-gap (normalized video coords), so the
+  // glasses are sized relative to their actual face, not a fixed fraction
+  // of the frame — kept fresh here, read from the sizing tick below too.
+  // Starts at a plausible default rather than 0, so the very first sprite
+  // (before any eyePositions event has arrived) isn't sized to nothing.
+  const eyeGapRef = useRef(0.1);
 
-  // Keep the mask flag in step with the eyes and the current glasses.
+  // Keep the mask flag and the live eye-gap in step with the eyes and the current glasses.
   useEffect(() => {
     if (!detector) return;
     const off = detector.on("eyePositions", (eyes) => {
+      eyeGapRef.current = eyeGap(eyes.left, eyes.right);
       const g = glassesRef.current;
       maskRef.current = Boolean(g && bothEyesCovered(eyes.left, eyes.right, g, getTuning()));
     });
@@ -118,7 +125,8 @@ export function Sunglasses() {
       const center = toLayerPx(layer, video, g.x, g.y);
       if (!center) return;
       const scale = Math.max(layer.clientWidth / video.videoWidth, layer.clientHeight / video.videoHeight);
-      setSprite({ left: center.x, top: center.y, size: t.glassesWidth * video.videoWidth * scale });
+      const width = eyeGapRef.current * t.glassesEyeGapMultiplier;
+      setSprite({ left: center.x, top: center.y, size: width * video.videoWidth * scale });
     }, TICK_MS);
     return () => clearInterval(id);
   }, [alive, maskRef, videoRef, photoRef]);

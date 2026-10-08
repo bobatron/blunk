@@ -80,7 +80,12 @@ export class FaceSignalsDetector {
   private rightWinkFrames = 0;
   private lastFaceAt = 0;
   private eyesWarned = false;
-  private puckerState = false;
+  /** When the pucker score last crossed above puckerOn, or null while below
+   * it — used to require it be held for puckerHoldMs before firing, so
+   * quickly passing through a pucker-ish mouth shape (e.g. opening the
+   * mouth to eat a bug) doesn't falsely trigger the blink-break powerup. */
+  private puckerStartedAt: number | null = null;
+  private puckerFired = false;
   private video: HTMLVideoElement;
 
   constructor(video: HTMLVideoElement) {
@@ -139,7 +144,7 @@ export class FaceSignalsDetector {
           const r = landmarks[RIGHT_IRIS];
           this.emit("eyePositions", { left: { x: l.x, y: l.y }, right: { x: r.x, y: r.y } });
         }
-        if (categories) this.processCategories(categories);
+        if (categories) this.processCategories(categories, now);
         if (landmarks) {
           const upper = landmarks[UPPER_INNER_LIP];
           const lower = landmarks[LOWER_INNER_LIP];
@@ -171,7 +176,7 @@ export class FaceSignalsDetector {
     }
   }
 
-  private processCategories(categories: { categoryName: string; score: number }[]) {
+  private processCategories(categories: { categoryName: string; score: number }[], now: number) {
     const t = getTuning();
     const get = (name: string) => categories.find((c) => c.categoryName === name)?.score ?? 0;
 
@@ -212,13 +217,21 @@ export class FaceSignalsDetector {
     if (this.leftWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "left" });
     if (this.rightWinkFrames === t.winkDebounceFrames) this.emit("wink", { eye: "right" });
 
-    // Pucker: rising edge, with hysteresis so it doesn't flicker.
+    // Pucker: must be held above the threshold for puckerHoldMs before
+    // firing (once per hold), with hysteresis on release so it doesn't
+    // flicker. The hold requirement is what stops a quick, incidental
+    // pucker-ish mouth shape — like opening the mouth to eat a bug — from
+    // falsely triggering it.
     const pucker = get("mouthPucker");
-    if (pucker > t.puckerOn && !this.puckerState) {
-      this.puckerState = true;
-      this.emit("pucker");
+    if (pucker > t.puckerOn) {
+      this.puckerStartedAt ??= now;
+      if (!this.puckerFired && now - this.puckerStartedAt >= t.puckerHoldMs) {
+        this.puckerFired = true;
+        this.emit("pucker");
+      }
     } else if (pucker < t.puckerOn * 0.6) {
-      this.puckerState = false;
+      this.puckerStartedAt = null;
+      this.puckerFired = false;
     }
 
     // Mouth open/closed.

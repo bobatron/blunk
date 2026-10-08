@@ -86,6 +86,7 @@ export function Lobby() {
     playerNames,
     roomType,
     roundActive,
+    roundCountdownEndsAt,
     winnerId,
     config,
     setConfig,
@@ -118,7 +119,7 @@ export function Lobby() {
     }
   }, [winnerId]);
 
-  if (roundActive || spotStream) return null;
+  if (roundActive || roundCountdownEndsAt || spotStream) return null;
 
   const hasPlayedARound = winnerId !== undefined;
   const winnerName = winnerId ? playerNames[winnerId] : null;
@@ -162,28 +163,32 @@ export function Lobby() {
       )}
 
       {isRandom ? (
-        <div className="lobby-vote">
-          {votingResolvedMode && !vote && (
-            <p className="vote-resolved">{MODE_LABELS[votingResolvedMode]} won the vote!</p>
-          )}
-          {vote ? (
-            <VoteChoices
-              key={vote.endsAt}
-              modes={vote.modes}
-              endsAt={vote.endsAt}
-              voteCount={vote.voteCount}
-              playerCount={players.length}
-              castVote={castVote}
-            />
-          ) : (
-            <>
-              <button type="button" onClick={startVoting} disabled={!canStart}>
-                Start the vote
-              </button>
-              {!canStart && <p className="hint">Waiting for at least 2 players to join...</p>}
-            </>
-          )}
-        </div>
+        // Nothing to vote on while a round that just won a vote (Bug Hunt)
+        // is actually still playing — the vote already resolved to get here.
+        !bugHunt && (
+          <div className="lobby-vote">
+            {votingResolvedMode && !vote && (
+              <p className="vote-resolved">{MODE_LABELS[votingResolvedMode]} won the vote!</p>
+            )}
+            {vote ? (
+              <VoteChoices
+                key={vote.endsAt}
+                modes={vote.modes}
+                endsAt={vote.endsAt}
+                voteCount={vote.voteCount}
+                playerCount={players.length}
+                castVote={castVote}
+              />
+            ) : (
+              <>
+                <button type="button" onClick={startVoting} disabled={!canStart}>
+                  Start the vote
+                </button>
+                {!canStart && <p className="hint">Waiting for at least 2 players to join...</p>}
+              </>
+            )}
+          </div>
+        )
       ) : (
         <>
           <div className="lobby-settings">

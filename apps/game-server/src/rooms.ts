@@ -33,6 +33,9 @@ export interface Room {
   powerups: Map<string, number>;
   blinkBreakUntil: Map<string, number>;
   roundTimer: NodeJS.Timeout | null;
+  /** Set while a "get ready" countdown is running, before the round
+   * actually goes live — roomIsIdle treats this the same as an active round. */
+  roundCountdownTimer: NodeJS.Timeout | null;
   bugHunt: BugHunt | null;
   vote: VoteState | null;
   spotStream: SpotStreamState | null;
@@ -60,6 +63,7 @@ export function getOrCreateRoom(roomId: string, roomType?: RoomType): Room {
       powerups: new Map(),
       blinkBreakUntil: new Map(),
       roundTimer: null,
+      roundCountdownTimer: null,
       bugHunt: null,
       vote: null,
       spotStream: null,
@@ -106,5 +110,5 @@ export function broadcastLobby(room: Room): void {
 /** Is anything actually using the room right now — a round, Bug Hunt, Spot
  * the Real Stream, or a vote in progress? Used to gate starting a new one. */
 export function roomIsIdle(room: Room): boolean {
-  return !room.roundActive && !room.bugHunt && !room.vote && !room.spotStream;
+  return !room.roundActive && !room.roundCountdownTimer && !room.bugHunt && !room.vote && !room.spotStream;
 }

@@ -69,6 +69,9 @@ export interface GameState {
   roomType: RoomType | null;
   config: RoomConfig;
   roundActive: boolean;
+  /** Epoch ms when a "get ready" countdown finishes and the round actually
+   * goes live, or null when no countdown is running. */
+  roundCountdownEndsAt: number | null;
   /** Epoch ms when the round times out, or null for no time limit. */
   roundEndsAt: number | null;
   eliminations: Elimination[];
@@ -123,6 +126,7 @@ export const initialGameState: GameState = {
   roomType: null,
   config: DEFAULT_CONFIG,
   roundActive: false,
+  roundCountdownEndsAt: null,
   roundEndsAt: null,
   eliminations: [],
   winnerId: undefined,

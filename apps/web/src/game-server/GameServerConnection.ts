@@ -49,6 +49,8 @@ export interface GameServerEvents {
     config: RoomConfig;
     roomType: RoomType | null;
   }) => void;
+  /** A "get ready" beat before round-started actually makes the round live. */
+  "round-countdown": (payload: { startsAt: number; serverNow: number }) => void;
   "round-started": (payload: { endsAt: number | null; lives: number; serverNow: number }) => void;
   "life-lost": (payload: {
     playerId: string;

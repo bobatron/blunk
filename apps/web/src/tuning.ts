@@ -15,7 +15,11 @@ export interface Tuning {
   mouthOn: number;
   mouthOff: number;
   puckerOn: number;
-  glassesWidth: number;
+  puckerHoldMs: number;
+  /** Glasses width as a multiple of this player's own live eye-gap, not a
+   * fixed fraction of the frame — so they look the same size whether the
+   * camera is close (phone) or far (laptop). */
+  glassesEyeGapMultiplier: number;
   glassesCoverSlack: number;
   glassesFirstMinMs: number;
   glassesFirstMaxMs: number;
@@ -45,7 +49,8 @@ export const DEFAULT_TUNING: Tuning = {
   mouthOn: 0.25,
   mouthOff: 0.15,
   puckerOn: 0.5,
-  glassesWidth: 0.2,
+  puckerHoldMs: 500,
+  glassesEyeGapMultiplier: 2.2,
   glassesCoverSlack: 0.7,
   glassesFirstMinMs: 10000,
   glassesFirstMaxMs: 15000,

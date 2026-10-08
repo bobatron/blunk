@@ -17,11 +17,20 @@ function useNow(intervalMs: number): number {
  * is lost, and the big "BLUNK!" reveal when someone's out.
  */
 export function StaringContest() {
-  const { playerId, players, roundActive, roundEndsAt, eliminations, lastLifeLost, lastPhoto } =
-    useGameServer();
+  const {
+    playerId,
+    players,
+    roundActive,
+    roundCountdownEndsAt,
+    roundEndsAt,
+    eliminations,
+    lastLifeLost,
+    lastPhoto,
+  } = useGameServer();
   const [photoToast, setPhotoToast] = useState<{ text: string; key: number } | null>(null);
   const [flash, setFlash] = useState<{ name: string; key: number } | null>(null);
   const [lifeToast, setLifeToast] = useState<string | null>(null);
+  const [selfHurtFlash, setSelfHurtFlash] = useState<number | null>(null);
   const wasRoundActive = useRef(false);
   const now = useNow(250);
 
@@ -70,6 +79,16 @@ export function StaringContest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastLifeLost]);
 
+  // A brief red flash just for the player who lost the life — the toast
+  // above already tells the whole room, but this is the "ouch, that was
+  // me" gut-punch, visible only on their own screen.
+  useEffect(() => {
+    if (!lastLifeLost || lastLifeLost.playerId !== playerId || lastLifeLost.livesLeft <= 0) return;
+    setSelfHurtFlash(lastLifeLost.key);
+    const timer = setTimeout(() => setSelfHurtFlash(null), 500);
+    return () => clearTimeout(timer);
+  }, [lastLifeLost, playerId]);
+
   useEffect(() => {
     if (!lastPhoto) return;
     playCamera();
@@ -80,13 +99,22 @@ export function StaringContest() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastPhoto]);
 
-  if (!roundActive && !flash && !lifeToast && !photoToast) return null;
+  if (!roundActive && !roundCountdownEndsAt && !flash && !lifeToast && !photoToast && !selfHurtFlash) {
+    return null;
+  }
 
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
   const remainingSec = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
+  const countdownSec = roundCountdownEndsAt ? Math.max(0, Math.ceil((roundCountdownEndsAt - now) / 1000)) : null;
 
   return (
-    <div className="staring-contest-hud">
+    <div className={`staring-contest-hud${selfHurtFlash ? " self-hurt" : ""}`}>
+      {countdownSec !== null && (
+        <div className="round-countdown">
+          <p className="round-countdown-label">Get ready — don't blink!</p>
+          <p className="round-countdown-number">{countdownSec}</p>
+        </div>
+      )}
       {roundActive && (
         <p className="round-status">
           {remainingSec === null ? "∞" : `${remainingSec}s`} · {players.length - eliminations.length}{" "}

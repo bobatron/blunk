@@ -23,6 +23,7 @@ export type GameEvent =
       config: RoomConfig;
       roomType: RoomType | null;
     }
+  | { type: "round-countdown"; startsAt: number; serverNow: number; now: number }
   | { type: "round-started"; endsAt: number | null; serverNow: number; now: number }
   | { type: "life-lost"; playerId: string; livesLeft: number; reason: "eye-closed" | "eyes-missing" | "photo" }
   | { type: "photo-taken"; playerId: string }
@@ -82,12 +83,18 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
       };
     }
 
+    case "round-countdown": {
+      const clockOffset = event.serverNow - event.now;
+      return { ...state, clockOffset, roundCountdownEndsAt: event.startsAt - clockOffset };
+    }
+
     case "round-started": {
       const clockOffset = event.serverNow - event.now;
       return {
         ...state,
         clockOffset,
         roundActive: true,
+        roundCountdownEndsAt: null,
         roundEndsAt: event.endsAt === null ? null : event.endsAt - clockOffset,
         eliminations: [],
         winnerId: undefined,

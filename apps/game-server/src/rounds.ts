@@ -5,6 +5,9 @@ import { registerModeStarter, notifyModeEnded } from "./hooks.js";
 
 export const BLINK_BREAK_MS = 5000;
 export const MAX_POWERUPS = 3;
+/** "Get ready" countdown before a round actually goes live — long enough to
+ * stop blinking naturally before it starts costing lives. */
+export const ROUND_COUNTDOWN_MS = 3000;
 
 export function endRound(room: Room, winnerId: string | null): void {
   room.roundActive = false;
@@ -18,6 +21,8 @@ export function endRound(room: Room, winnerId: string | null): void {
 export function cancelRoundTimer(room: Room): void {
   if (room.roundTimer) clearTimeout(room.roundTimer);
   room.roundTimer = null;
+  if (room.roundCountdownTimer) clearTimeout(room.roundCountdownTimer);
+  room.roundCountdownTimer = null;
 }
 
 export function aliveIds(room: Room): string[] {
@@ -85,6 +90,22 @@ export function handleStartRound(room: Room, socket?: WebSocket): void {
   }
   if (room.players.size < 2) {
     socket?.send(JSON.stringify({ type: "error", message: "Need at least 2 players to start" }));
+    return;
+  }
+  // A "get ready" beat before the round actually goes live — blinking
+  // during it doesn't cost anything, since roundActive doesn't flip until
+  // beginRound runs.
+  const startsAt = Date.now() + ROUND_COUNTDOWN_MS;
+  broadcast(room, { type: "round-countdown", startsAt, serverNow: Date.now() });
+  room.roundCountdownTimer = setTimeout(() => beginRound(room), ROUND_COUNTDOWN_MS);
+}
+
+function beginRound(room: Room): void {
+  room.roundCountdownTimer = null;
+  // Someone may have left during the countdown — back out cleanly rather
+  // than start a round that's no longer valid.
+  if (room.players.size < 2) {
+    broadcastLobby(room);
     return;
   }
   room.roundActive = true;

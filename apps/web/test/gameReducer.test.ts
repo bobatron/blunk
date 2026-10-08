@@ -46,6 +46,18 @@ test("lobby-state updates players and accumulates playerNames, even across depar
   assert.deepEqual(s2.playerNames, { a: "Alice", b: "Bob" });
 });
 
+test("round-countdown sets roundCountdownEndsAt, converted onto this browser's clock", () => {
+  const next = gameReducer(initialGameState, { type: "round-countdown", startsAt: 8000, serverNow: 3000, now: 0 });
+  assert.equal(next.roundCountdownEndsAt, 5000);
+  assert.equal(next.clockOffset, 3000);
+});
+
+test("round-started clears roundCountdownEndsAt once the round actually goes live", () => {
+  const prior = state({ roundCountdownEndsAt: 5000 });
+  const next = gameReducer(prior, { type: "round-started", endsAt: null, serverNow: 0, now: 0 });
+  assert.equal(next.roundCountdownEndsAt, null);
+});
+
 test("round-started resets round state but keeps the scoreboard", () => {
   const prior = state({
     scores: { a: 2 },

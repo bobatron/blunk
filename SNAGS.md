@@ -1,0 +1,16 @@
+# List of snags I will add to as I notice them during play testing
+## Open
+
+## Fixed
+
+- The blink break timer does not seem consistent. Is it random? or how is it determined. I think 5 seconds is fine.
+- In spot the real stream the model player sees their own feed mirrored in their view and that makes it confusing to see. I think the model should see their feed mirrored too just for that portion of the game.
+- In spot the real stream the judges can see camera feed icon on the model players real feed, and also  a signal strength icon. This instantly gives away the real feed.
+- The player states need to reset after a game finshes. When I tested the vote game mode, i observed 1 player continue to have the "BLUNKED" message on their screen from a previous game, this continue on during bug hunt game.
+- On mobile the white flash at the start of the spot the real stream game illuminates the players face making it very obvious which box is the live feed. We should grab the screenshot of their face just before the white flash occurs.
+- I would like to make spot the real stream more fun. Here is my suggestions each player get a go at being the model in a game, and scores are tallied throughout. Currently when the game ends it finished abruptly returning players to the lobby -> instead I would like there to be a 5 second section at the end where the winner is announce (model player name or judge(s) player name(s)) - also I think the actual model players box should get highlighted to reveal where they were - in this 5 second section the model player can choose to move themselves too to prove it was them and this will make the game funner. Once that has happened it should move to another player being the model, and this should repeat until all players have had a turn at being the model.
+- I noticed on my mac during testing that when I ate a bug it auto triggered the blink break. I think we need to tune the lips pucker. My suggestion is that the mouth puck should face should need to be detected for a period of time before activating the powerup. This can be fine tune, but maybe 0.5s. (Fixed: pucker now needs to hold for a tunable puckerHoldMs, 500ms default, before firing.)
+- I noticed on my phone that the size of the glasses in proportion to my face were different than on my macbook. I think this might be because my phone tends to be closer to my face. Is there a way that we can dynamically size the glasses based on the size of the gap between the players eyes? (Fixed: glasses are now sized as a tunable multiple of each player's own live eye-gap, not a fixed fraction of the frame.)
+- The bug is with bug hunt. When this is played the screen shows "start the vote" while it is in play. (Fixed: the vote UI now hides while Bug Hunt is actually playing.)
+- When a staring competition is started can the game begin with a countdown to give players a chance to prepare to get ready and not blink. (Fixed: a 3s "get ready" countdown now runs before the round goes live — blinking during it costs nothing.)
+- When a player loses a life in a staring competition, can the screen flash red temporarily so they know they have lost a life. (Fixed: a brief red flash now shows on the screen of the player who lost the life.)

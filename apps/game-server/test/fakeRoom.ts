@@ -39,6 +39,7 @@ export function fakeRoom(
     powerups: new Map(),
     blinkBreakUntil: new Map(),
     roundTimer: null,
+    roundCountdownTimer: null,
     bugHunt: null,
     vote: null,
     spotStream: null,

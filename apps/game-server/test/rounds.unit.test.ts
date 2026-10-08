@@ -34,6 +34,7 @@ function fakeRoom(lives: Record<string, number>): { room: Room; sent: Record<str
     powerups: new Map(),
     blinkBreakUntil: new Map(),
     roundTimer: null,
+    roundCountdownTimer: null,
     bugHunt: null,
     vote: null,
     spotStream: null,

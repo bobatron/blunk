@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_TUNING, resetTuning, setTuning, useTuning, type Tuning } from "./tuning";
 import { useStandaloneFace } from "./useStandaloneFace";
 import { BugField, type Chomp } from "./BugField";
-import { bothEyesCovered } from "./glassesMath";
+import { bothEyesCovered, eyeGap } from "./glassesMath";
 import { getTuning } from "./tuning";
 import "./TuningPage.css";
 import "./Sunglasses.css";
@@ -25,7 +25,7 @@ const SECTIONS: Section[] = [
   {
     title: "Sunglasses (size)",
     sliders: [
-      { key: "glassesWidth", label: "Size, fraction of the screen", min: 0.05, max: 0.8, step: 0.01 },
+      { key: "glassesEyeGapMultiplier", label: "Size, × your eye gap", min: 1, max: 5, step: 0.1 },
       { key: "glassesCoverSlack", label: "Eye-cover tolerance", min: 0.3, max: 1.5, step: 0.05 },
     ],
   },
@@ -58,6 +58,7 @@ const SECTIONS: Section[] = [
       { key: "mouthOn", label: "Mouth opens above", min: 0.05, max: 1, step: 0.01 },
       { key: "mouthOff", label: "Mouth closes below", min: 0.02, max: 0.8, step: 0.01 },
       { key: "puckerOn", label: "Pucker above (blink-break)", min: 0.05, max: 1, step: 0.01 },
+      { key: "puckerHoldMs", label: "Pucker must hold for", min: 0, max: 2000, step: 50, unit: "ms" },
     ],
   },
   {
@@ -88,10 +89,12 @@ export function TuningPage() {
   const [copied, setCopied] = useState(false);
   const [chomp, setChomp] = useState<(Chomp & { key: number }) | null>(null);
   const [covered, setCovered] = useState(false);
+  const [liveEyeGap, setLiveEyeGap] = useState(0.1);
 
   useEffect(() => {
     if (!detector) return;
     return detector.on("eyePositions", (eyes) => {
+      setLiveEyeGap(eyeGap(eyes.left, eyes.right));
       setCovered(bothEyesCovered(eyes.left, eyes.right, { x: 0.5, y: 0.5 }, getTuning()));
     });
   }, [detector]);
@@ -143,7 +146,7 @@ export function TuningPage() {
               style={{
                 left: "50%",
                 top: "50%",
-                fontSize: `${values.glassesWidth * 100}cqw`,
+                fontSize: `${liveEyeGap * values.glassesEyeGapMultiplier * 100}cqw`,
               }}
             >
               🕶️

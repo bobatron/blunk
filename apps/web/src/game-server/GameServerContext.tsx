@@ -30,6 +30,9 @@ export function GameServerProvider({
       connection.on("lobby-state", ({ players, roundActive, config, roomType }) =>
         dispatch({ type: "lobby-state", players, roundActive, config, roomType }),
       ),
+      connection.on("round-countdown", ({ startsAt, serverNow }) =>
+        dispatch({ type: "round-countdown", startsAt, serverNow, now: Date.now() }),
+      ),
       connection.on("round-started", ({ endsAt, serverNow }) =>
         dispatch({ type: "round-started", endsAt, serverNow, now: Date.now() }),
       ),

@@ -28,6 +28,32 @@ test("joining broadcasts lobby state with both players", async () => {
   b.ws.close();
 });
 
+test("a 'get ready' countdown runs before the round goes live, and blinking during it costs nothing", async () => {
+  const room = uniqueRoom("countdown");
+  const a = await connect();
+  const b = await connect();
+  await join(a, room, "A");
+  await join(b, room, "B");
+
+  send(a, { type: "start-round" });
+  const countdown = await waitFor(a, (m) => m.type === "round-countdown");
+  assert.ok(countdown.startsAt > Date.now(), "startsAt should be in the future");
+
+  // Blink right away, before the round is actually live.
+  send(a, { type: "blunk" });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(
+    a.messages.some((m) => m.type === "life-lost"),
+    false,
+    "blinking during the countdown shouldn't cost a life",
+  );
+
+  await waitFor(a, (m) => m.type === "round-started", 5000);
+
+  a.ws.close();
+  b.ws.close();
+});
+
 test("lives count down, then elimination, then the other player wins", async () => {
   const room = uniqueRoom("lives");
   const a = await connect();
@@ -36,7 +62,7 @@ test("lives count down, then elimination, then the other player wins", async () 
   await join(b, room, "B");
 
   send(a, { type: "start-round" });
-  await waitFor(a, (m) => m.type === "round-started");
+  await waitFor(a, (m) => m.type === "round-started", 5000);
 
   send(a, { type: "blunk" });
   const first = await waitFor(a, (m) => m.type === "life-lost");
@@ -63,7 +89,7 @@ test("a blink-break protects against a blink", async () => {
   await join(b, room, "B");
 
   send(a, { type: "start-round" });
-  await waitFor(a, (m) => m.type === "round-started");
+  await waitFor(a, (m) => m.type === "round-started", 5000);
 
   send(a, { type: "earn-powerup" });
   await waitFor(a, (m) => m.type === "lobby-state" && m.players.find((p: any) => p.name === "A")?.powerups === 1);
@@ -90,7 +116,7 @@ test("a masked blink (photo) costs everyone else a life, not the photographer", 
   const [aId] = ids;
 
   send(clients[0], { type: "start-round" });
-  await waitFor(clients[0], (m) => m.type === "round-started");
+  await waitFor(clients[0], (m) => m.type === "round-started", 5000);
 
   send(clients[0], { type: "masked-blink" });
   await waitFor(clients[0], (m) => m.type === "photo-taken");
@@ -118,7 +144,7 @@ test("eyes-missing costs a life", async () => {
   await join(b, room, "B");
 
   send(a, { type: "start-round" });
-  await waitFor(a, (m) => m.type === "round-started");
+  await waitFor(a, (m) => m.type === "round-started", 5000);
 
   send(a, { type: "eyes-missing" });
   const loss = await waitFor(a, (m) => m.type === "life-lost");
@@ -178,7 +204,7 @@ test("disconnecting mid-round eliminates the player and can end the round", asyn
   await join(b, room, "B");
 
   send(a, { type: "start-round" });
-  await waitFor(a, (m) => m.type === "round-started");
+  await waitFor(a, (m) => m.type === "round-started", 5000);
 
   a.ws.close();
 
