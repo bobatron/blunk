@@ -242,9 +242,28 @@ test("error records the message", () => {
 
 test("voting-started opens a vote and clears any prior resolved-mode announcement", () => {
   const prior = state({ votingResolvedMode: "bug-hunt" });
-  const next = gameReducer(prior, { type: "voting-started", endsAt: 9000, modes: ["staring", "bug-hunt"] });
+  const next = gameReducer(prior, {
+    type: "voting-started",
+    endsAt: 9000,
+    modes: ["staring", "bug-hunt"],
+    serverNow: 0,
+    now: 0,
+  });
   assert.deepEqual(next.vote, { endsAt: 9000, modes: ["staring", "bug-hunt"], voteCount: 0 });
   assert.equal(next.votingResolvedMode, null);
+});
+
+test("voting-started converts endsAt onto this browser's clock, same as every other server timer", () => {
+  // Server is 3s ahead of this browser — endsAt should land 3s earlier locally.
+  const next = gameReducer(initialGameState, {
+    type: "voting-started",
+    endsAt: 20_000,
+    modes: ["staring"],
+    serverNow: 13_000,
+    now: 10_000,
+  });
+  assert.equal(next.vote?.endsAt, 17_000);
+  assert.equal(next.clockOffset, 3000);
 });
 
 test("vote-cast updates the tally, and is a no-op with no vote in progress", () => {
@@ -282,7 +301,13 @@ test("spot-stream-started opens posing phase, clears the last result, and clears
     eliminations: [{ playerId: "a", place: 1 }],
     blinkBreaks: { b: 123 },
   });
-  const next = gameReducer(prior, { type: "spot-stream-started", modelId: "a", poseEndsAt: 5000 });
+  const next = gameReducer(prior, {
+    type: "spot-stream-started",
+    modelId: "a",
+    poseEndsAt: 5000,
+    serverNow: 0,
+    now: 0,
+  });
   assert.deepEqual(next.spotStream, {
     modelId: "a",
     phase: "posing",
@@ -296,6 +321,19 @@ test("spot-stream-started opens posing phase, clears the last result, and clears
   assert.equal(next.spotStreamResult, null);
   assert.deepEqual(next.eliminations, []);
   assert.deepEqual(next.blinkBreaks, {});
+});
+
+test("spot-stream-started converts poseEndsAt onto this browser's clock — a skewed clock was making the model's countdown wrong", () => {
+  // Server is 3s ahead of this browser — poseEndsAt should land 3s earlier locally.
+  const next = gameReducer(initialGameState, {
+    type: "spot-stream-started",
+    modelId: "a",
+    poseEndsAt: 8000,
+    serverNow: 3000,
+    now: 0,
+  });
+  assert.equal(next.spotStream?.poseEndsAt, 5000);
+  assert.equal(next.clockOffset, 3000);
 });
 
 test("spot-stream-capture only bumps the capture key — it's the model's cue to grab a frame", () => {
@@ -320,10 +358,29 @@ test("spot-stream-voting moves to the voting phase with the decoy grid details",
     boxCount: 8,
     liveBoxIndex: 3,
     votingEndsAt: 9000,
+    serverNow: 0,
+    now: 0,
   });
   assert.equal(next.spotStream?.phase, "voting");
   assert.equal(next.spotStream?.frame, "data:image/jpeg;base64,xx");
   assert.equal(next.spotStream?.liveBoxIndex, 3);
+});
+
+test("spot-stream-voting converts votingEndsAt onto this browser's clock", () => {
+  const posing = state({
+    spotStream: { modelId: "a", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 },
+  });
+  // Server is 3s ahead of this browser — votingEndsAt should land 3s earlier locally.
+  const next = gameReducer(posing, {
+    type: "spot-stream-voting",
+    frame: "x",
+    boxCount: 8,
+    liveBoxIndex: 0,
+    votingEndsAt: 33_000,
+    serverNow: 13_000,
+    now: 10_000,
+  });
+  assert.equal(next.spotStream?.votingEndsAt, 30_000);
 });
 
 test("spot-stream-vote-cast updates the tally", () => {

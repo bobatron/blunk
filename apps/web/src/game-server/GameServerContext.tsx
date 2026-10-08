@@ -60,16 +60,18 @@ export function GameServerProvider({
       connection.on("round-snapshot", ({ playerId, image }) =>
         dispatch({ type: "round-snapshot", playerId, image }),
       ),
-      connection.on("voting-started", ({ endsAt, modes }) => dispatch({ type: "voting-started", endsAt, modes })),
+      connection.on("voting-started", ({ endsAt, modes, serverNow }) =>
+        dispatch({ type: "voting-started", endsAt, modes, serverNow, now: Date.now() }),
+      ),
       connection.on("vote-cast", ({ voteCount }) => dispatch({ type: "vote-cast", voteCount })),
       connection.on("voting-resolved", ({ mode }) => dispatch({ type: "voting-resolved", mode })),
-      connection.on("spot-stream-started", ({ modelId, poseEndsAt }) =>
-        dispatch({ type: "spot-stream-started", modelId, poseEndsAt }),
+      connection.on("spot-stream-started", ({ modelId, poseEndsAt, serverNow }) =>
+        dispatch({ type: "spot-stream-started", modelId, poseEndsAt, serverNow, now: Date.now() }),
       ),
       connection.on("spot-stream-capture", () => dispatch({ type: "spot-stream-capture" })),
       connection.on("spot-stream-flash", () => dispatch({ type: "spot-stream-flash" })),
-      connection.on("spot-stream-voting", ({ frame, boxCount, liveBoxIndex, votingEndsAt }) =>
-        dispatch({ type: "spot-stream-voting", frame, boxCount, liveBoxIndex, votingEndsAt }),
+      connection.on("spot-stream-voting", ({ frame, boxCount, liveBoxIndex, votingEndsAt, serverNow }) =>
+        dispatch({ type: "spot-stream-voting", frame, boxCount, liveBoxIndex, votingEndsAt, serverNow, now: Date.now() }),
       ),
       connection.on("spot-stream-vote-cast", ({ voteCount }) =>
         dispatch({ type: "spot-stream-vote-cast", voteCount }),

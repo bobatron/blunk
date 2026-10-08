@@ -36,13 +36,21 @@ export type GameEvent =
   | { type: "bug-hunt-scores"; eaten: Record<string, number> }
   | { type: "bug-hunt-over"; results: { playerId: string; eaten: number }[] }
   | { type: "round-snapshot"; playerId: string; image: string }
-  | { type: "voting-started"; endsAt: number; modes: ModeKey[] }
+  | { type: "voting-started"; endsAt: number; modes: ModeKey[]; serverNow: number; now: number }
   | { type: "vote-cast"; voteCount: number }
   | { type: "voting-resolved"; mode: ModeKey }
-  | { type: "spot-stream-started"; modelId: string; poseEndsAt: number }
+  | { type: "spot-stream-started"; modelId: string; poseEndsAt: number; serverNow: number; now: number }
   | { type: "spot-stream-capture" }
   | { type: "spot-stream-flash" }
-  | { type: "spot-stream-voting"; frame: string; boxCount: number; liveBoxIndex: number; votingEndsAt: number }
+  | {
+      type: "spot-stream-voting";
+      frame: string;
+      boxCount: number;
+      liveBoxIndex: number;
+      votingEndsAt: number;
+      serverNow: number;
+      now: number;
+    }
   | { type: "spot-stream-vote-cast"; voteCount: number }
   | { type: "spot-stream-voided" }
   | { type: "spot-stream-series-over" }
@@ -210,12 +218,15 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
       return { ...state, bugHunt: null, bugHuntResults: ranked, scores };
     }
 
-    case "voting-started":
+    case "voting-started": {
+      const clockOffset = event.serverNow - event.now;
       return {
         ...state,
-        vote: { endsAt: event.endsAt, modes: event.modes, voteCount: 0 },
+        clockOffset,
+        vote: { endsAt: event.endsAt - clockOffset, modes: event.modes, voteCount: 0 },
         votingResolvedMode: null,
       };
+    }
 
     case "vote-cast":
       if (!state.vote) return state;
@@ -224,13 +235,15 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
     case "voting-resolved":
       return { ...state, vote: null, votingResolvedMode: event.mode };
 
-    case "spot-stream-started":
+    case "spot-stream-started": {
+      const clockOffset = event.serverNow - event.now;
       return {
         ...state,
+        clockOffset,
         spotStream: {
           modelId: event.modelId,
           phase: "posing",
-          poseEndsAt: event.poseEndsAt,
+          poseEndsAt: event.poseEndsAt - clockOffset,
           frame: null,
           boxCount: 0,
           liveBoxIndex: null,
@@ -242,6 +255,7 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         eliminations: [],
         blinkBreaks: {},
       };
+    }
 
     // No state change beyond the key bump — it's just the signal for the
     // model's own client to grab a frame, BEFORE the flash fires below.
@@ -253,19 +267,22 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
     case "spot-stream-flash":
       return { ...state, spotStreamFlashKey: state.spotStreamFlashKey + 1 };
 
-    case "spot-stream-voting":
+    case "spot-stream-voting": {
       if (!state.spotStream) return state;
+      const clockOffset = event.serverNow - event.now;
       return {
         ...state,
+        clockOffset,
         spotStream: {
           ...state.spotStream,
           phase: "voting",
           frame: event.frame,
           boxCount: event.boxCount,
           liveBoxIndex: event.liveBoxIndex,
-          votingEndsAt: event.votingEndsAt,
+          votingEndsAt: event.votingEndsAt - clockOffset,
         },
       };
+    }
 
     case "spot-stream-vote-cast":
       if (!state.spotStream) return state;
