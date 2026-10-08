@@ -23,11 +23,11 @@ export type GameEvent =
       config: RoomConfig;
       roomType: RoomType | null;
     }
-  | { type: "round-started"; endsAt: number | null }
+  | { type: "round-started"; endsAt: number | null; serverNow: number; now: number }
   | { type: "life-lost"; playerId: string; livesLeft: number; reason: "eye-closed" | "eyes-missing" | "photo" }
   | { type: "photo-taken"; playerId: string }
   | { type: "player-eliminated"; playerId: string; place: number }
-  | { type: "blink-break"; playerId: string; until: number }
+  | { type: "blink-break"; playerId: string; until: number; serverNow: number; now: number }
   | { type: "blink-break-expired"; playerId: string; until: number }
   | { type: "round-over"; winnerId: string | null }
   | { type: "bug-hunt-started"; endsAt: number; serverNow: number; now: number }
@@ -82,11 +82,13 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
       };
     }
 
-    case "round-started":
+    case "round-started": {
+      const clockOffset = event.serverNow - event.now;
       return {
         ...state,
+        clockOffset,
         roundActive: true,
-        roundEndsAt: event.endsAt,
+        roundEndsAt: event.endsAt === null ? null : event.endsAt - clockOffset,
         eliminations: [],
         winnerId: undefined,
         blinkBreaks: {},
@@ -95,6 +97,7 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         votingResolvedMode: null,
         spotStreamResult: null,
       };
+    }
 
     case "life-lost": {
       const key = state.lifeKeyCounter + 1;
@@ -116,8 +119,14 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         eliminations: [...state.eliminations, { playerId: event.playerId, place: event.place }],
       };
 
-    case "blink-break":
-      return { ...state, blinkBreaks: { ...state.blinkBreaks, [event.playerId]: event.until } };
+    case "blink-break": {
+      const clockOffset = event.serverNow - event.now;
+      return {
+        ...state,
+        clockOffset,
+        blinkBreaks: { ...state.blinkBreaks, [event.playerId]: event.until - clockOffset },
+      };
+    }
 
     case "blink-break-expired": {
       // A newer blink-break may have replaced this one since the timer was set —

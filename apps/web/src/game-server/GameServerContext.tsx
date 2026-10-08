@@ -30,7 +30,9 @@ export function GameServerProvider({
       connection.on("lobby-state", ({ players, roundActive, config, roomType }) =>
         dispatch({ type: "lobby-state", players, roundActive, config, roomType }),
       ),
-      connection.on("round-started", ({ endsAt }) => dispatch({ type: "round-started", endsAt })),
+      connection.on("round-started", ({ endsAt, serverNow }) =>
+        dispatch({ type: "round-started", endsAt, serverNow, now: Date.now() }),
+      ),
       connection.on("life-lost", ({ playerId, livesLeft, reason }) =>
         dispatch({ type: "life-lost", playerId, livesLeft, reason }),
       ),
@@ -38,12 +40,18 @@ export function GameServerProvider({
       connection.on("player-eliminated", ({ playerId, place }) =>
         dispatch({ type: "player-eliminated", playerId, place }),
       ),
-      connection.on("blink-break", ({ playerId, until }) => {
-        dispatch({ type: "blink-break", playerId, until });
+      connection.on("blink-break", ({ playerId, until, serverNow }) => {
+        const now = Date.now();
+        // The same conversion the reducer applies, done here too so the
+        // expiry timer fires at the right local-clock moment and reports
+        // the same (converted) `until` the reducer actually stored — the
+        // blink-break-expired guard below compares against that value.
+        const localUntil = until - (serverNow - now);
+        dispatch({ type: "blink-break", playerId, until, serverNow, now });
         timers.push(
           setTimeout(
-            () => dispatch({ type: "blink-break-expired", playerId, until }),
-            Math.max(0, until - Date.now()),
+            () => dispatch({ type: "blink-break-expired", playerId, until: localUntil }),
+            Math.max(0, localUntil - Date.now()),
           ),
         );
       }),

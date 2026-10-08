@@ -49,7 +49,7 @@ export interface GameServerEvents {
     config: RoomConfig;
     roomType: RoomType | null;
   }) => void;
-  "round-started": (payload: { endsAt: number | null; lives: number }) => void;
+  "round-started": (payload: { endsAt: number | null; lives: number; serverNow: number }) => void;
   "life-lost": (payload: {
     playerId: string;
     livesLeft: number;
@@ -57,7 +57,7 @@ export interface GameServerEvents {
   }) => void;
   "photo-taken": (payload: { playerId: string }) => void;
   "player-eliminated": (payload: { playerId: string; serverTimestamp: number; place: number }) => void;
-  "blink-break": (payload: { playerId: string; until: number }) => void;
+  "blink-break": (payload: { playerId: string; until: number; serverNow: number }) => void;
   "round-over": (payload: { winnerId: string | null }) => void;
   "bug-hunt-started": (payload: { endsAt: number; serverNow: number }) => void;
   "bug-spawn": (payload: { bug: ServerBug; serverNow: number }) => void;

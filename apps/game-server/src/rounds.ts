@@ -96,7 +96,7 @@ export function handleStartRound(room: Room, socket?: WebSocket): void {
   room.lastSnapshotAt = new Map();
   const { timeLimitSec } = room.config;
   const endsAt = timeLimitSec ? Date.now() + timeLimitSec * 1000 : null;
-  broadcast(room, { type: "round-started", endsAt, lives: room.config.lives });
+  broadcast(room, { type: "round-started", endsAt, lives: room.config.lives, serverNow: Date.now() });
   if (timeLimitSec) room.roundTimer = setTimeout(() => endByTime(room), timeLimitSec * 1000);
   broadcastLobby(room);
 }
@@ -133,7 +133,7 @@ export function handleUsePowerup(room: Room, playerId: string): void {
   room.powerups.set(playerId, count - 1);
   const until = Date.now() + BLINK_BREAK_MS;
   room.blinkBreakUntil.set(playerId, until);
-  broadcast(room, { type: "blink-break", playerId, until });
+  broadcast(room, { type: "blink-break", playerId, until, serverNow: Date.now() });
   broadcastLobby(room);
 }
 

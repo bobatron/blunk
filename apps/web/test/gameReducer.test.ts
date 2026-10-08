@@ -54,7 +54,7 @@ test("round-started resets round state but keeps the scoreboard", () => {
     blinkBreaks: { a: 123 },
     snapshots: [{ id: 1, playerId: "a", image: "x" }],
   });
-  const next = gameReducer(prior, { type: "round-started", endsAt: 5000 });
+  const next = gameReducer(prior, { type: "round-started", endsAt: 5000, serverNow: 0, now: 0 });
   assert.equal(next.roundActive, true);
   assert.equal(next.roundEndsAt, 5000);
   assert.deepEqual(next.eliminations, []);
@@ -62,6 +62,16 @@ test("round-started resets round state but keeps the scoreboard", () => {
   assert.deepEqual(next.blinkBreaks, {});
   assert.deepEqual(next.snapshots, []);
   assert.deepEqual(next.scores, { a: 2 }, "scores carry across rounds in the same session");
+});
+
+test("round-started converts endsAt onto this browser's clock — a skewed phone clock was making the round timer wrong", () => {
+  const next = gameReducer(initialGameState, { type: "round-started", endsAt: 8000, serverNow: 3000, now: 0 });
+  assert.equal(next.roundEndsAt, 5000);
+  assert.equal(next.clockOffset, 3000);
+
+  // null (no time limit) has no clock to convert — stays null.
+  const noLimit = gameReducer(initialGameState, { type: "round-started", endsAt: null, serverNow: 3000, now: 0 });
+  assert.equal(noLimit.roundEndsAt, null);
 });
 
 test("life-lost records the event with an incrementing key", () => {
@@ -87,17 +97,29 @@ test("player-eliminated appends to the elimination list", () => {
 });
 
 test("blink-break sets the expiry, and blink-break-expired clears only a stale one", () => {
-  const s1 = gameReducer(initialGameState, { type: "blink-break", playerId: "a", until: 1000 });
+  const s1 = gameReducer(initialGameState, { type: "blink-break", playerId: "a", until: 1000, serverNow: 0, now: 0 });
   assert.deepEqual(s1.blinkBreaks, { a: 1000 });
 
   // A newer blink-break replaces it...
-  const s2 = gameReducer(s1, { type: "blink-break", playerId: "a", until: 2000 });
+  const s2 = gameReducer(s1, { type: "blink-break", playerId: "a", until: 2000, serverNow: 0, now: 0 });
   // ...and an expiry event for the OLD timer must not clear the newer one.
   const s3 = gameReducer(s2, { type: "blink-break-expired", playerId: "a", until: 1000 });
   assert.deepEqual(s3.blinkBreaks, { a: 2000 }, "a stale expiry shouldn't clear a newer blink-break");
 
   const s4 = gameReducer(s3, { type: "blink-break-expired", playerId: "a", until: 2000 });
   assert.deepEqual(s4.blinkBreaks, {});
+});
+
+test("blink-break converts until onto this browser's clock — a skewed phone clock was making the countdown wrong", () => {
+  const next = gameReducer(initialGameState, {
+    type: "blink-break",
+    playerId: "a",
+    until: 8000,
+    serverNow: 3000,
+    now: 0,
+  });
+  assert.equal(next.blinkBreaks.a, 5000);
+  assert.equal(next.clockOffset, 3000);
 });
 
 test("round-over awards the winner a point, and a draw (null) awards nothing", () => {
@@ -133,7 +155,7 @@ test("round-over builds a reel from this round's snapshots, only if there are an
 
 test("round-started clears the reel (it only plays until the next round)", () => {
   const withReel = state({ reel: { key: 1, items: [] } });
-  const next = gameReducer(withReel, { type: "round-started", endsAt: null });
+  const next = gameReducer(withReel, { type: "round-started", endsAt: null, serverNow: 0, now: 0 });
   assert.equal(next.reel, null);
 });
 
@@ -283,7 +305,7 @@ test("voting-resolved clears the vote and announces the winning mode", () => {
 });
 
 test("round-started and bug-hunt-started clear a resolved-mode announcement once the mode actually starts", () => {
-  const afterStaring = gameReducer(state({ votingResolvedMode: "staring" }), { type: "round-started", endsAt: null });
+  const afterStaring = gameReducer(state({ votingResolvedMode: "staring" }), { type: "round-started", endsAt: null, serverNow: 0, now: 0 });
   assert.equal(afterStaring.votingResolvedMode, null);
 
   const afterBugHunt = gameReducer(state({ votingResolvedMode: "bug-hunt" }), {
