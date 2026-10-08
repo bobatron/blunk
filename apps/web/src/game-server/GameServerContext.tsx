@@ -66,6 +66,7 @@ export function GameServerProvider({
       connection.on("spot-stream-started", ({ modelId, poseEndsAt }) =>
         dispatch({ type: "spot-stream-started", modelId, poseEndsAt }),
       ),
+      connection.on("spot-stream-capture", () => dispatch({ type: "spot-stream-capture" })),
       connection.on("spot-stream-flash", () => dispatch({ type: "spot-stream-flash" })),
       connection.on("spot-stream-voting", ({ frame, boxCount, liveBoxIndex, votingEndsAt }) =>
         dispatch({ type: "spot-stream-voting", frame, boxCount, liveBoxIndex, votingEndsAt }),
@@ -77,6 +78,7 @@ export function GameServerProvider({
         dispatch({ type: "spot-stream-over", modelId, liveBoxIndex, judgeVotes, awards }),
       ),
       connection.on("spot-stream-voided", () => dispatch({ type: "spot-stream-voided" })),
+      connection.on("spot-stream-series-over", () => dispatch({ type: "spot-stream-series-over" })),
       connection.on("error", ({ message }) => dispatch({ type: "error", message })),
     ];
 

@@ -96,7 +96,12 @@ export interface GameState {
   votingResolvedMode: ModeKey | null;
   /** Spot the Real Stream, in progress. */
   spotStream: SpotStreamUiState | null;
-  /** Bumped on every "spot-stream-flash" — the model's client captures and sends a frame when this changes. */
+  /** Bumped on every "spot-stream-capture" — the model's client captures and
+   * sends a frame when this changes, BEFORE the flash fires (see
+   * spotStreamFlashKey below), so the still isn't lit by the screen's own flash. */
+  spotStreamCaptureKey: number;
+  /** Bumped on every "spot-stream-flash" — purely the visual/audio cue, fired
+   * only after the capture above has already happened. */
   spotStreamFlashKey: number;
   /** The reveal from the last finished Spot the Real Stream round. */
   spotStreamResult: SpotStreamResult | null;
@@ -133,6 +138,7 @@ export const initialGameState: GameState = {
   vote: null,
   votingResolvedMode: null,
   spotStream: null,
+  spotStreamCaptureKey: 0,
   spotStreamFlashKey: 0,
   spotStreamResult: null,
   errorMessage: null,

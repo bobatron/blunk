@@ -69,6 +69,8 @@ export interface GameServerEvents {
   "vote-cast": (payload: { playerId: string; voteCount: number }) => void;
   "voting-resolved": (payload: { mode: ModeKey }) => void;
   "spot-stream-started": (payload: { modelId: string; poseEndsAt: number; serverNow: number }) => void;
+  /** The model's client should grab a frame right now, before anyone sees the flash. */
+  "spot-stream-capture": (payload: { modelId: string }) => void;
   "spot-stream-flash": (payload: Record<string, never>) => void;
   "spot-stream-voting": (payload: {
     frame: string;
@@ -85,6 +87,8 @@ export interface GameServerEvents {
     awards: SpotStreamAward[];
   }) => void;
   "spot-stream-voided": (payload: Record<string, never>) => void;
+  /** The whole series is done — everyone's had a turn as the model. */
+  "spot-stream-series-over": (payload: Record<string, never>) => void;
   error: (payload: { message: string }) => void;
 }
 

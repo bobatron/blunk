@@ -41,16 +41,23 @@
   background: #1d1426;
 }
 
-.spot-stream-model-tile .lk-participant-tile,
 .spot-stream-model-placeholder {
   height: 100%;
   width: 100%;
 }
 
-.spot-stream-model-tile .lk-participant-media-video {
+/* Bare video, no LiveKit chrome (name/connection/camera icons) — those
+   icons would be an instant tell for which decoy box is the real feed. */
+.spot-stream-video {
   height: 100%;
   width: 100%;
   object-fit: cover;
+  display: block;
+}
+
+/* Mirrored only on the model's own screen — posing feels like a mirror. */
+.spot-stream-video.mirrored {
+  transform: scaleX(-1);
 }
 
 .spot-stream-countdown {
@@ -110,9 +117,7 @@
   cursor: default;
 }
 
-.spot-stream-box img,
-.spot-stream-box .lk-participant-tile,
-.spot-stream-box .lk-participant-media-video {
+.spot-stream-box img {
   height: 100%;
   width: 100%;
   object-fit: cover;
@@ -125,4 +130,16 @@
 
 .spot-stream-box:not(:disabled):hover {
   border-color: var(--accent);
+}
+
+/* The reveal: highlight exactly where the model really was. */
+.spot-stream-box.reveal-live {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold), 0 0 24px 4px var(--gold);
+  animation: reveal-live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes reveal-live-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--gold), 0 0 24px 4px var(--gold); }
+  50% { box-shadow: 0 0 0 3px var(--gold), 0 0 10px 2px var(--gold); }
 }

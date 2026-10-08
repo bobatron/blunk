@@ -29,11 +29,11 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
     gameRef.current = game;
   });
 
-  // The instant the flash goes off in Spot the Real Stream, the model's own
-  // client grabs a frame and sends it — everyone else just watches for the
-  // flash broadcast and the frame that follows.
+  // The moment the pose timer ends in Spot the Real Stream, the model's own
+  // client grabs a frame and sends it — BEFORE the flash fires (a separate,
+  // later signal), so the screen's own flash never lights the still.
   useEffect(() => {
-    if (game.spotStreamFlashKey === 0) return;
+    if (game.spotStreamCaptureKey === 0) return;
     if (game.spotStream?.modelId !== game.playerId) return;
     const video = videoRef.current;
     // Unmirrored: this still sits next to the model's own real, unmirrored
@@ -43,7 +43,7 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
     if (image) game.sendSpotStreamFrame(image);
     // Only the key changing should trigger a capture, not every state change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.spotStreamFlashKey]);
+  }, [game.spotStreamCaptureKey]);
 
   useEffect(() => {
     const track = cameraTrack?.track;

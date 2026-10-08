@@ -111,6 +111,16 @@ test("round-over awards the winner a point, and a draw (null) awards nothing", (
   assert.equal(draw.winnerId, null);
 });
 
+test("round-over clears eliminations and blink-breaks, so a stale BLUNKED badge doesn't ride into the next mode", () => {
+  const prior = state({
+    eliminations: [{ playerId: "a", place: 1 }],
+    blinkBreaks: { b: Date.now() + 5000 },
+  });
+  const next = gameReducer(prior, { type: "round-over", winnerId: "b" });
+  assert.deepEqual(next.eliminations, []);
+  assert.deepEqual(next.blinkBreaks, {});
+});
+
 test("round-over builds a reel from this round's snapshots, only if there are any", () => {
   const withSnaps = state({ snapshots: [{ id: 1, playerId: "a", image: "x" }] });
   const s1 = gameReducer(withSnaps, { type: "round-over", winnerId: "a" });
@@ -142,14 +152,17 @@ test("round-snapshot appends with an incrementing id", () => {
   ]);
 });
 
-test("bug-hunt-started computes the clock offset and starts an empty hunt", () => {
+test("bug-hunt-started computes the clock offset, starts an empty hunt, and clears stale elimination badges", () => {
   const serverNow = 10_000;
   const now = 9_500; // server is 500ms ahead
-  const next = gameReducer(initialGameState, { type: "bug-hunt-started", endsAt: 70_000, serverNow, now });
+  const prior = state({ eliminations: [{ playerId: "a", place: 1 }], blinkBreaks: { b: 123 } });
+  const next = gameReducer(prior, { type: "bug-hunt-started", endsAt: 70_000, serverNow, now });
   assert.equal(next.clockOffset, 500);
   assert.deepEqual(next.bugHunt, { endsAt: 70_000 - 500, eaten: {}, bugs: [] });
   assert.equal(next.bugHuntResults, null);
   assert.equal(next.huntClaim, null);
+  assert.deepEqual(next.eliminations, []);
+  assert.deepEqual(next.blinkBreaks, {});
 });
 
 test("bug-spawn converts the bug's path onto this browser's clock and appends it", () => {
@@ -263,8 +276,12 @@ test("round-started and bug-hunt-started clear a resolved-mode announcement once
   assert.equal(afterBugHunt.votingResolvedMode, null);
 });
 
-test("spot-stream-started opens posing phase and clears the last result", () => {
-  const prior = state({ spotStreamResult: { modelId: "a", liveBoxIndex: 0, judgeVotes: [], awards: [] } });
+test("spot-stream-started opens posing phase, clears the last result, and clears stale elimination badges", () => {
+  const prior = state({
+    spotStreamResult: { modelId: "a", liveBoxIndex: 0, judgeVotes: [], awards: [] },
+    eliminations: [{ playerId: "a", place: 1 }],
+    blinkBreaks: { b: 123 },
+  });
   const next = gameReducer(prior, { type: "spot-stream-started", modelId: "a", poseEndsAt: 5000 });
   assert.deepEqual(next.spotStream, {
     modelId: "a",
@@ -277,9 +294,18 @@ test("spot-stream-started opens posing phase and clears the last result", () => 
     voteCount: 0,
   });
   assert.equal(next.spotStreamResult, null);
+  assert.deepEqual(next.eliminations, []);
+  assert.deepEqual(next.blinkBreaks, {});
 });
 
-test("spot-stream-flash only bumps the capture key", () => {
+test("spot-stream-capture only bumps the capture key — it's the model's cue to grab a frame", () => {
+  const posing = state({ spotStream: { modelId: "a", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
+  const next = gameReducer(posing, { type: "spot-stream-capture" });
+  assert.equal(next.spotStreamCaptureKey, 1);
+  assert.equal(next.spotStream?.phase, "posing");
+});
+
+test("spot-stream-flash only bumps the flash key — it's purely the visual/audio cue", () => {
   const posing = state({ spotStream: { modelId: "a", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
   const next = gameReducer(posing, { type: "spot-stream-flash" });
   assert.equal(next.spotStreamFlashKey, 1);
@@ -306,7 +332,7 @@ test("spot-stream-vote-cast updates the tally", () => {
   assert.equal(next.spotStream?.voteCount, 1);
 });
 
-test("spot-stream-over records the reveal and applies awards to the scoreboard", () => {
+test("spot-stream-over moves to the reveal phase (model's box stays live) and applies awards to the scoreboard", () => {
   const prior = state({ scores: { model: 1 }, spotStream: { modelId: "model", phase: "voting", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 3, votingEndsAt: 1, voteCount: 2 } });
   const next = gameReducer(prior, {
     type: "spot-stream-over",
@@ -318,7 +344,10 @@ test("spot-stream-over records the reveal and applies awards to the scoreboard",
     ],
     awards: [{ playerId: "x", points: 3 }],
   });
-  assert.equal(next.spotStream, null);
+  // Stays up as a reveal — the series moves on via its own later event
+  // (spot-stream-started for the next turn, or spot-stream-series-over).
+  assert.equal(next.spotStream?.phase, "reveal");
+  assert.equal(next.spotStream?.liveBoxIndex, 3);
   assert.deepEqual(next.spotStreamResult, {
     modelId: "model",
     liveBoxIndex: 3,
@@ -331,10 +360,14 @@ test("spot-stream-over records the reveal and applies awards to the scoreboard",
   assert.deepEqual(next.scores, { model: 1, x: 3 });
 });
 
-test("spot-stream-voided just clears the round, with no reveal and no score change", () => {
+test("spot-stream-voided changes nothing — the next real event (a new turn, or the series ending) follows immediately", () => {
   const prior = state({ scores: { model: 1 }, spotStream: { modelId: "model", phase: "posing", poseEndsAt: 1, frame: null, boxCount: 0, liveBoxIndex: null, votingEndsAt: null, voteCount: 0 } });
   const next = gameReducer(prior, { type: "spot-stream-voided" });
+  assert.equal(next, prior);
+});
+
+test("spot-stream-series-over clears spotStream, returning control to the lobby", () => {
+  const prior = state({ spotStream: { modelId: "model", phase: "reveal", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 3, votingEndsAt: null, voteCount: 2 } });
+  const next = gameReducer(prior, { type: "spot-stream-series-over" });
   assert.equal(next.spotStream, null);
-  assert.equal(next.spotStreamResult, null);
-  assert.deepEqual(next.scores, { model: 1 });
 });

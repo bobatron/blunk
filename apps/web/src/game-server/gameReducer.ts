@@ -40,9 +40,12 @@ export type GameEvent =
   | { type: "vote-cast"; voteCount: number }
   | { type: "voting-resolved"; mode: ModeKey }
   | { type: "spot-stream-started"; modelId: string; poseEndsAt: number }
+  | { type: "spot-stream-capture" }
   | { type: "spot-stream-flash" }
   | { type: "spot-stream-voting"; frame: string; boxCount: number; liveBoxIndex: number; votingEndsAt: number }
   | { type: "spot-stream-vote-cast"; voteCount: number }
+  | { type: "spot-stream-voided" }
+  | { type: "spot-stream-series-over" }
   | {
       type: "spot-stream-over";
       modelId: string;
@@ -50,7 +53,6 @@ export type GameEvent =
       judgeVotes: SpotStreamJudgeVote[];
       awards: SpotStreamAward[];
     }
-  | { type: "spot-stream-voided" }
   | { type: "error"; message: string }
   | { type: "dismiss-reel" };
 
@@ -134,6 +136,11 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         scores: event.winnerId
           ? { ...state.scores, [event.winnerId]: (state.scores[event.winnerId] ?? 0) + 1 }
           : state.scores,
+        // Elimination/blink-break badges belong only to this round — clear
+        // them now rather than letting a stale "BLUNKED" overlay ride along
+        // into whatever mode gets played next.
+        eliminations: [],
+        blinkBreaks: {},
       };
     }
 
@@ -159,6 +166,8 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         huntClaim: null,
         votingResolvedMode: null,
         spotStreamResult: null,
+        eliminations: [],
+        blinkBreaks: {},
       };
     }
 
@@ -230,10 +239,17 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         },
         spotStreamResult: null,
         votingResolvedMode: null,
+        eliminations: [],
+        blinkBreaks: {},
       };
 
-    // No state change beyond the key bump — it just tells the model's
-    // client (via the key changing) that now's the moment to grab a frame.
+    // No state change beyond the key bump — it's just the signal for the
+    // model's own client to grab a frame, BEFORE the flash fires below.
+    case "spot-stream-capture":
+      return { ...state, spotStreamCaptureKey: state.spotStreamCaptureKey + 1 };
+
+    // Purely the visual/audio cue — fires only once the capture above has
+    // already happened, so the screen's own flash never lights the still.
     case "spot-stream-flash":
       return { ...state, spotStreamFlashKey: state.spotStreamFlashKey + 1 };
 
@@ -262,7 +278,11 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
       );
       return {
         ...state,
-        spotStream: null,
+        // Stay on screen as a "reveal" — the model's box keeps showing their
+        // real feed, free to move and prove it was them, for a few more
+        // seconds before the next player's turn (or the whole series ending)
+        // arrives as its own event.
+        spotStream: state.spotStream ? { ...state.spotStream, phase: "reveal" } : null,
         spotStreamResult: {
           modelId: event.modelId,
           liveBoxIndex: event.liveBoxIndex,
@@ -273,7 +293,13 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
       };
     }
 
+    // The next turn's "spot-stream-started", or "spot-stream-series-over",
+    // always follows immediately — so there's nothing to do here but wait
+    // for whichever of those actually arrives.
     case "spot-stream-voided":
+      return state;
+
+    case "spot-stream-series-over":
       return { ...state, spotStream: null };
 
     case "error":
