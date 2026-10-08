@@ -94,7 +94,13 @@ export function SpotStream() {
   })();
 
   return (
-    <div className={`spot-stream${flash ? " spot-stream-flash" : ""}`}>
+    // The visual flash is suppressed on the model's own screen (sound still
+    // plays for them) — their camera keeps streaming as the live box right
+    // through voting, so their own screen flashing white would physically
+    // light their face up differently for that moment, a dead giveaway
+    // the decoy stills (already captured, unaffected by anything after)
+    // never have.
+    <div className={`spot-stream${flash && !isModel ? " spot-stream-flash" : ""}`}>
       {stream.phase === "posing" && (
         <div className="spot-stream-posing">
           <h2>This round's model is {modelName}!</h2>

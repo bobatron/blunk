@@ -38,8 +38,10 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
     const video = videoRef.current;
     // Unmirrored: this still sits next to the model's own real, unmirrored
     // remote tile in the decoy grid, and judges would spot the live box in
-    // an instant if the still were flipped relative to it.
-    const image = video ? captureFace(video, { mirror: false }) : null;
+    // an instant if the still were flipped relative to it. High-res: shown
+    // at full box size next to the live feed, not as a small thumbnail — a
+    // soft, low-res still was itself a dead giveaway.
+    const image = video ? captureFace(video, { mirror: false, highRes: true }) : null;
     if (image) game.sendSpotStreamFrame(image);
     // Only the key changing should trigger a capture, not every state change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

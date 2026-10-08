@@ -14,6 +14,10 @@ export const SPOT_STREAM_BOX_COUNT = 8;
 /** If the model's client never gets a frame back to us (dropped camera,
  * slow device), skip their turn rather than leave judges staring at nothing. */
 const FRAME_TIMEOUT_MS = 4000;
+/** Extra breathing room between the still safely arriving here and the
+ * flash actually firing, on top of capture already happening strictly
+ * before any flash is even broadcast. */
+const FLASH_DELAY_MS = 200;
 /** How long the reveal (winner announcement + highlighted box, model free
  * to move and prove it was them) stays up before the next player's turn. */
 export const REVEAL_MS = 5000;
@@ -128,24 +132,30 @@ function onPoseTimerEnd(room: Room): void {
 export function handleSpotStreamFrame(room: Room, playerId: string, image: unknown): void {
   const stream = room.spotStream;
   if (!stream || stream.phase !== "posing" || playerId !== stream.modelId) return;
+  if (stream.frame !== null) return; // already got one for this turn
   if (typeof image !== "string" || !image.startsWith("data:image/jpeg;base64,")) return;
   if (stream.frameTimeout) clearTimeout(stream.frameTimeout);
   stream.frameTimeout = null;
   stream.frame = image;
   stream.liveBoxIndex = Math.floor(Math.random() * stream.boxCount);
-  stream.phase = "voting";
-  stream.votingEndsAt = Date.now() + SPOT_STREAM_VOTE_MS;
-  stream.votingTimer = setTimeout(() => resolveSpotStream(room), SPOT_STREAM_VOTE_MS);
-  // Now that the still is safely captured, the flash is purely for show.
-  broadcast(room, { type: "spot-stream-flash" });
-  broadcast(room, {
-    type: "spot-stream-voting",
-    frame: stream.frame,
-    boxCount: stream.boxCount,
-    liveBoxIndex: stream.liveBoxIndex,
-    votingEndsAt: stream.votingEndsAt,
-    serverNow: Date.now(),
-  });
+  // The still is already safely captured at this point — this delay is
+  // purely so the flash itself (and the live feed resuming visibility
+  // through it) can't possibly bleed into anything.
+  setTimeout(() => {
+    if (room.spotStream !== stream || stream.phase !== "posing") return;
+    stream.phase = "voting";
+    stream.votingEndsAt = Date.now() + SPOT_STREAM_VOTE_MS;
+    stream.votingTimer = setTimeout(() => resolveSpotStream(room), SPOT_STREAM_VOTE_MS);
+    broadcast(room, { type: "spot-stream-flash" });
+    broadcast(room, {
+      type: "spot-stream-voting",
+      frame: stream.frame,
+      boxCount: stream.boxCount,
+      liveBoxIndex: stream.liveBoxIndex,
+      votingEndsAt: stream.votingEndsAt,
+      serverNow: Date.now(),
+    });
+  }, FLASH_DELAY_MS);
 }
 
 // A vote locks in the moment it lands — no changing your mind, and arrival

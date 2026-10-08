@@ -118,6 +118,31 @@ test("a frame from anyone but the model is ignored", () => {
   cancelSpotStream(room);
 });
 
+test("a valid frame moves to voting only after a short delay, not immediately — extra room for the flash to never bleed into anything", async () => {
+  const { room } = fakeRoom(["model", "judge"]);
+  handleStartSpotStream(room);
+  const model = room.spotStream!.modelId;
+  handleSpotStreamFrame(room, model, "data:image/jpeg;base64,xx");
+  // Still "posing" right away — the still is captured, but the flash/voting
+  // transition is deliberately deferred.
+  assert.equal(room.spotStream!.phase, "posing");
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(room.spotStream!.phase, "voting");
+  assert.ok(room.spotStream!.liveBoxIndex !== null);
+  cancelSpotStream(room);
+});
+
+test("a second frame for the same turn is ignored — the first one already locked in", async () => {
+  const { room } = fakeRoom(["model", "judge"]);
+  handleStartSpotStream(room);
+  const model = room.spotStream!.modelId;
+  handleSpotStreamFrame(room, model, "data:image/jpeg;base64,first");
+  handleSpotStreamFrame(room, model, "data:image/jpeg;base64,second");
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(room.spotStream!.frame, "data:image/jpeg;base64,first");
+  cancelSpotStream(room);
+});
+
 test("a vote locks in — a second vote from the same judge is ignored", () => {
   // Two judges, so the first judge's vote doesn't itself resolve the round —
   // otherwise there'd be no "voting" phase left for the second vote to hit.
