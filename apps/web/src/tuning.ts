@@ -50,7 +50,7 @@ export const DEFAULT_TUNING: Tuning = {
   mouthOff: 0.15,
   puckerOn: 0.5,
   puckerHoldMs: 500,
-  glassesEyeGapMultiplier: 2.2,
+  glassesEyeGapMultiplier: 3.4,
   glassesCoverSlack: 0.7,
   glassesFirstMinMs: 10000,
   glassesFirstMaxMs: 15000,

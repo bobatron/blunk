@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useGameServer } from "./game-server/useGameServer";
-import { playBlunk, playCamera, playLifeLost, playRoundStart } from "./sounds";
+import { playBlunk, playCamera, playCountdownBeep, playCountdownGo, playLifeLost } from "./sounds";
 import "./StaringContest.css";
 
 function useNow(intervalMs: number): number {
@@ -32,12 +32,26 @@ export function StaringContest() {
   const [lifeToast, setLifeToast] = useState<string | null>(null);
   const [selfHurtFlash, setSelfHurtFlash] = useState<number | null>(null);
   const wasRoundActive = useRef(false);
+  const prevCountdownSec = useRef<number | null>(null);
   const now = useNow(250);
+  const countdownSec = roundCountdownEndsAt ? Math.max(0, Math.ceil((roundCountdownEndsAt - now) / 1000)) : null;
 
   useEffect(() => {
-    if (roundActive && !wasRoundActive.current) playRoundStart();
+    if (roundActive && !wasRoundActive.current) playCountdownGo();
     wasRoundActive.current = roundActive;
   }, [roundActive]);
+
+  // Two low beeps on the way down, then the high "go" beep above fires
+  // separately the instant the round actually goes live.
+  useEffect(() => {
+    if (countdownSec === null) {
+      prevCountdownSec.current = null;
+      return;
+    }
+    if (countdownSec === prevCountdownSec.current) return;
+    prevCountdownSec.current = countdownSec;
+    if (countdownSec === 2 || countdownSec === 1) playCountdownBeep();
+  }, [countdownSec]);
 
   useEffect(() => {
     if (eliminations.length === 0) {
@@ -105,10 +119,14 @@ export function StaringContest() {
 
   const isEliminated = eliminations.some((e) => e.playerId === playerId);
   const remainingSec = roundEndsAt ? Math.max(0, Math.ceil((roundEndsAt - now) / 1000)) : null;
-  const countdownSec = roundCountdownEndsAt ? Math.max(0, Math.ceil((roundCountdownEndsAt - now) / 1000)) : null;
 
   return (
-    <div className={`staring-contest-hud${selfHurtFlash ? " self-hurt" : ""}`}>
+    <div className="staring-contest-hud">
+      {selfHurtFlash && (
+        <div key={selfHurtFlash} className="self-hurt-flash">
+          <div className="self-hurt-stamp">BLUNK!</div>
+        </div>
+      )}
       {countdownSec !== null && (
         <div className="round-countdown">
           <p className="round-countdown-label">Get ready — don't blink!</p>

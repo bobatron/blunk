@@ -87,8 +87,8 @@ export function GameServerProvider({
       connection.on("spot-stream-vote-cast", ({ voteCount }) =>
         dispatch({ type: "spot-stream-vote-cast", voteCount }),
       ),
-      connection.on("spot-stream-over", ({ modelId, liveBoxIndex, judgeVotes, awards }) =>
-        dispatch({ type: "spot-stream-over", modelId, liveBoxIndex, judgeVotes, awards }),
+      connection.on("spot-stream-over", ({ modelId, liveBoxIndex, judgeVotes, awards, frame }) =>
+        dispatch({ type: "spot-stream-over", modelId, liveBoxIndex, judgeVotes, awards, frame }),
       ),
       connection.on("spot-stream-voided", () => dispatch({ type: "spot-stream-voided" })),
       connection.on("spot-stream-series-over", () => dispatch({ type: "spot-stream-series-over" })),

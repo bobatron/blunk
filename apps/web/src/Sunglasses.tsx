@@ -13,6 +13,12 @@ interface Glasses extends GlassesPos {
   angle: number;
   turnAt: number;
   expiresAt: number;
+  /** Computed once when these glasses spawn, from the live eye-gap at that
+   * moment — not recomputed every tick. A player's eye-gap barely changes
+   * tick to tick, so there's nothing to gain from re-reading it 25x/sec,
+   * and it's one less thing competing for the main thread alongside
+   * MediaPipe + WebRTC on a loaded mobile device. */
+  width: number;
 }
 
 /**
@@ -69,6 +75,7 @@ export function Sunglasses() {
         angle: rand(0, Math.PI * 2),
         turnAt: now + rand(t.glassesTurnMinMs, Math.max(t.glassesTurnMinMs, t.glassesTurnMaxMs)),
         expiresAt: now + t.glassesLifetimeMs,
+        width: eyeGapRef.current * t.glassesEyeGapMultiplier,
       };
       timer = setTimeout(spawn, rand(t.glassesGapMinMs, Math.max(t.glassesGapMinMs, t.glassesGapMaxMs)));
     };
@@ -78,11 +85,25 @@ export function Sunglasses() {
   }, [alive]);
 
   // Drift the glasses around the face and place the sprite.
+  // Set for real at the top of the effect below before it's ever read —
+  // 0 here is just a stable initial value so useRef doesn't call Date.now()
+  // on every render.
+  const lastTickRef = useRef(0);
   useEffect(() => {
     if (!alive) return;
+    lastTickRef.current = Date.now();
     const id = setInterval(() => {
       const now = Date.now();
       const t = getTuning();
+      // Real elapsed time, not the nominal TICK_MS — a setInterval callback
+      // can get delayed under main-thread load (MediaPipe + WebRTC + React
+      // all competing for it, worse on a weaker mobile CPU), and advancing
+      // by a fixed 40ms-worth of movement regardless of how late the tick
+      // actually fired is exactly what made the glasses visibly crawl.
+      // Clamped so a backgrounded tab resuming doesn't jump them across
+      // the screen in one tick.
+      const dt = Math.min(now - lastTickRef.current, 200) / 1000;
+      lastTickRef.current = now;
       if (photoRef.current !== photosSeen.current) {
         // A photo was taken with these glasses: take them off until the next appearance.
         photosSeen.current = photoRef.current;
@@ -96,7 +117,6 @@ export function Sunglasses() {
         g = null;
       }
       if (g) {
-        const dt = TICK_MS / 1000;
         let angle = g.angle;
         let turnAt = g.turnAt;
         if (now >= turnAt) {
@@ -125,8 +145,7 @@ export function Sunglasses() {
       const center = toLayerPx(layer, video, g.x, g.y);
       if (!center) return;
       const scale = Math.max(layer.clientWidth / video.videoWidth, layer.clientHeight / video.videoHeight);
-      const width = eyeGapRef.current * t.glassesEyeGapMultiplier;
-      setSprite({ left: center.x, top: center.y, size: width * video.videoWidth * scale });
+      setSprite({ left: center.x, top: center.y, size: g.width * video.videoWidth * scale });
     }, TICK_MS);
     return () => clearInterval(id);
   }, [alive, maskRef, videoRef, photoRef]);

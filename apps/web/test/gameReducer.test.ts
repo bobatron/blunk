@@ -269,6 +269,19 @@ test("bug-hunt-over ranks results and awards the top eater, unless it's a tie or
   assert.deepEqual(nobodyAte.scores, {});
 });
 
+test("bug-hunt-over builds a reel from this hunt's mouth-moment snapshots, only if there are any", () => {
+  const withSnaps = state({
+    bugHunt: { endsAt: 1, eaten: {}, bugs: [] },
+    snapshots: [{ id: 1, playerId: "a", image: "x" }],
+  });
+  const next = gameReducer(withSnaps, { type: "bug-hunt-over", results: [] });
+  assert.deepEqual(next.reel, { key: 1, items: [{ id: 1, playerId: "a", image: "x" }] });
+
+  const withoutSnaps = state({ bugHunt: { endsAt: 1, eaten: {}, bugs: [] }, snapshots: [] });
+  const noReel = gameReducer(withoutSnaps, { type: "bug-hunt-over", results: [] });
+  assert.equal(noReel.reel, null);
+});
+
 test("error records the message", () => {
   const next = gameReducer(initialGameState, { type: "error", message: "nope" });
   assert.equal(next.errorMessage, "nope");
@@ -434,6 +447,7 @@ test("spot-stream-over moves to the reveal phase (model's box stays live) and ap
       { playerId: "y", box: 0, correct: false },
     ],
     awards: [{ playerId: "x", points: 3 }],
+    frame: "model-pose.jpg",
   });
   // Stays up as a reveal — the series moves on via its own later event
   // (spot-stream-started for the next turn, or spot-stream-series-over).
@@ -449,6 +463,8 @@ test("spot-stream-over moves to the reveal phase (model's box stays live) and ap
     awards: [{ playerId: "x", points: 3 }],
   });
   assert.deepEqual(next.scores, { model: 1, x: 3 });
+  // Kept for the end-of-series pose reel.
+  assert.deepEqual(next.spotStreamPoses, [{ playerId: "model", frame: "model-pose.jpg" }]);
 });
 
 test("spot-stream-voided changes nothing — the next real event (a new turn, or the series ending) follows immediately", () => {
@@ -461,4 +477,46 @@ test("spot-stream-series-over clears spotStream, returning control to the lobby"
   const prior = state({ spotStream: { modelId: "model", phase: "reveal", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 3, votingEndsAt: null, voteCount: 2 } });
   const next = gameReducer(prior, { type: "spot-stream-series-over" });
   assert.equal(next.spotStream, null);
+});
+
+test("spot-stream-series-over builds a reel from this series' poses, only if there are any", () => {
+  const withPoses = state({ spotStreamPoses: [{ playerId: "a", frame: "x" }, { playerId: "b", frame: "y" }] });
+  const next = gameReducer(withPoses, { type: "spot-stream-series-over" });
+  assert.deepEqual(next.spotStreamReel, {
+    key: 1,
+    items: [
+      { id: 0, playerId: "a", image: "x" },
+      { id: 1, playerId: "b", image: "y" },
+    ],
+  });
+  assert.deepEqual(next.spotStreamPoses, []);
+
+  const withoutPoses = state({ spotStreamPoses: [] });
+  const noReel = gameReducer(withoutPoses, { type: "spot-stream-series-over" });
+  assert.equal(noReel.spotStreamReel, null);
+});
+
+test("spot-stream-started only resets accumulated poses at the start of a fresh series, not on every turn", () => {
+  const midSeries = state({
+    spotStream: { modelId: "a", phase: "reveal", poseEndsAt: null, frame: "x", boxCount: 8, liveBoxIndex: 0, votingEndsAt: null, voteCount: 1 },
+    spotStreamPoses: [{ playerId: "a", frame: "x" }],
+  });
+  const nextTurn = gameReducer(midSeries, {
+    type: "spot-stream-started",
+    modelId: "b",
+    poseEndsAt: 5000,
+    serverNow: 0,
+    now: 0,
+  });
+  assert.deepEqual(nextTurn.spotStreamPoses, [{ playerId: "a", frame: "x" }], "mid-series: poses so far are kept");
+
+  const freshSeries = state({ spotStream: null, spotStreamPoses: [{ playerId: "a", frame: "x" }] });
+  const firstTurn = gameReducer(freshSeries, {
+    type: "spot-stream-started",
+    modelId: "a",
+    poseEndsAt: 5000,
+    serverNow: 0,
+    now: 0,
+  });
+  assert.deepEqual(firstTurn.spotStreamPoses, [], "a fresh series starts with an empty pose list");
 });

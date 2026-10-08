@@ -133,6 +133,13 @@
   text-align: center;
 }
 
+.lobby-bughunt-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .lobby-bughunt h3,
 .lobby-snapshots h3 {
   margin: 0 0 4px;

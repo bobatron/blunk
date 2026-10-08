@@ -61,6 +61,7 @@ export type GameEvent =
       liveBoxIndex: number;
       judgeVotes: SpotStreamJudgeVote[];
       awards: SpotStreamAward[];
+      frame: string;
     }
   | { type: "error"; message: string }
   | { type: "dismiss-reel" };
@@ -103,6 +104,8 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         reel: null,
         votingResolvedMode: null,
         spotStreamResult: null,
+        bugHuntResults: null,
+        spotStreamReel: null,
       };
     }
 
@@ -192,6 +195,9 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         spotStreamResult: null,
         eliminations: [],
         blinkBreaks: {},
+        snapshots: [],
+        reel: null,
+        spotStreamReel: null,
       };
     }
 
@@ -231,7 +237,16 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
         first && first.eaten > 0 && (!second || second.eaten < first.eaten)
           ? { ...state.scores, [first.playerId]: (state.scores[first.playerId] ?? 0) + 1 }
           : state.scores;
-      return { ...state, bugHunt: null, bugHuntResults: ranked, scores };
+      const reel =
+        state.snapshots.length > 0 ? { key: state.reelKeyCounter + 1, items: state.snapshots } : state.reel;
+      return {
+        ...state,
+        bugHunt: null,
+        bugHuntResults: ranked,
+        scores,
+        reel,
+        reelKeyCounter: state.snapshots.length > 0 ? state.reelKeyCounter + 1 : state.reelKeyCounter,
+      };
     }
 
     case "voting-started": {
@@ -253,6 +268,10 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
 
     case "spot-stream-started": {
       const clockOffset = event.serverNow - event.now;
+      // spot-stream-started fires once per TURN, not once per series — only
+      // reset the accumulated poses if this is the first turn of a fresh
+      // series (no spotStream was running a moment ago).
+      const isNewSeries = state.spotStream === null;
       return {
         ...state,
         clockOffset,
@@ -267,9 +286,14 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
           voteCount: 0,
         },
         spotStreamResult: null,
+        spotStreamPoses: isNewSeries ? [] : state.spotStreamPoses,
+        spotStreamReel: isNewSeries ? null : state.spotStreamReel,
         votingResolvedMode: null,
         eliminations: [],
         blinkBreaks: {},
+        bugHuntResults: null,
+        reel: null,
+        snapshots: [],
       };
     }
 
@@ -322,6 +346,9 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
           judgeVotes: event.judgeVotes,
           awards: event.awards,
         },
+        // One pose per turn, kept across the whole series for the reel
+        // shown once it ends.
+        spotStreamPoses: [...state.spotStreamPoses, { playerId: event.modelId, frame: event.frame }],
         scores,
       };
     }
@@ -332,8 +359,22 @@ export function gameReducer(state: GameState, event: GameEvent): GameState {
     case "spot-stream-voided":
       return state;
 
-    case "spot-stream-series-over":
-      return { ...state, spotStream: null };
+    case "spot-stream-series-over": {
+      const spotStreamReel =
+        state.spotStreamPoses.length > 0
+          ? {
+              key: state.reelKeyCounter + 1,
+              items: state.spotStreamPoses.map((p, i) => ({ id: i, playerId: p.playerId, image: p.frame })),
+            }
+          : state.spotStreamReel;
+      return {
+        ...state,
+        spotStream: null,
+        spotStreamReel,
+        reelKeyCounter: state.spotStreamPoses.length > 0 ? state.reelKeyCounter + 1 : state.reelKeyCounter,
+        spotStreamPoses: [],
+      };
+    }
 
     case "error":
       return { ...state, errorMessage: event.message };

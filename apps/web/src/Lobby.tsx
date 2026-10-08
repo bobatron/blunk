@@ -4,6 +4,7 @@ import type { ModeKey } from "./game-server/GameServerConnection";
 import { Scoreboard } from "./Scoreboard";
 import { playJoin, playWinnerFanfare } from "./sounds";
 import { MomentsReel } from "./MomentsReel";
+import { PoseReel } from "./PoseReel";
 import "./Lobby.css";
 
 const LIVES_CHOICES = [1, 2, 3, 5];
@@ -190,74 +191,78 @@ export function Lobby() {
           </div>
         )
       ) : (
-        <>
-          <div className="lobby-settings">
-            <div className="setting-group">
-              <h3>Lives</h3>
-              <div className="choice-row">
-                {LIVES_CHOICES.map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    className={`choice${config.lives === n ? " selected" : ""}`}
-                    onClick={() => setConfig({ ...config, lives: n })}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="setting-group">
-              <h3>Timer</h3>
-              <div className="choice-row">
-                {TIME_CHOICES.map((t) => (
-                  <button
-                    key={t.label}
-                    type="button"
-                    className={`choice${config.timeLimitSec === t.value ? " selected" : ""}`}
-                    onClick={() => setConfig({ ...config, timeLimitSec: t.value })}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
+        <div className="lobby-settings">
+          <div className="setting-group">
+            <h3>Lives</h3>
+            <div className="choice-row">
+              {LIVES_CHOICES.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`choice${config.lives === n ? " selected" : ""}`}
+                  onClick={() => setConfig({ ...config, lives: n })}
+                >
+                  {n}
+                </button>
+              ))}
             </div>
           </div>
-          <div className="lobby-bughunt">
-            <h3>Bug Hunt</h3>
-            {bugHunt ? (
-              <>
-                <p className="hunt-time">
-                  {Math.max(0, Math.ceil((bugHunt.endsAt - now) / 1000))}s left, eat bugs!
-                </p>
-                <ul className="hunt-scores">
-                  {players.map((p) => (
-                    <li key={p.id}>
-                      {p.name}: <strong>{bugHunt.eaten[p.id] ?? 0}</strong>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <>
-                {bugHuntResults && (
-                  <p className="hunt-results">
-                    {bugHuntResults.map((r) => `${playerNames[r.playerId] ?? "?"} ${r.eaten}`).join(" · ")}
-                  </p>
-                )}
-                <button type="button" onClick={startBugHunt}>
-                  Play Bug Hunt (60s)
+          <div className="setting-group">
+            <h3>Timer</h3>
+            <div className="choice-row">
+              {TIME_CHOICES.map((t) => (
+                <button
+                  key={t.label}
+                  type="button"
+                  className={`choice${config.timeLimitSec === t.value ? " selected" : ""}`}
+                  onClick={() => setConfig({ ...config, timeLimitSec: t.value })}
+                >
+                  {t.label}
                 </button>
-                <button type="button" onClick={startSpotStream}>
-                  Play Spot the Real Stream
-                </button>
-              </>
-            )}
+              ))}
+            </div>
           </div>
-        </>
+        </div>
+      )}
+
+      {/* Shown for both lobby types — in a random lobby this is the only
+          feedback players get while Bug Hunt (won by vote) is playing. */}
+      {(bugHunt || bugHuntResults) && (
+        <div className="lobby-bughunt">
+          <h3>Bug Hunt</h3>
+          {bugHunt ? (
+            <>
+              <p className="hunt-time">{Math.max(0, Math.ceil((bugHunt.endsAt - now) / 1000))}s left, eat bugs!</p>
+              <ul className="hunt-scores">
+                {players.map((p) => (
+                  <li key={p.id}>
+                    {p.name}: <strong>{bugHunt.eaten[p.id] ?? 0}</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            bugHuntResults && (
+              <p className="hunt-results">
+                {bugHuntResults.map((r) => `${playerNames[r.playerId] ?? "?"} ${r.eaten}`).join(" · ")}
+              </p>
+            )
+          )}
+        </div>
+      )}
+      {!isRandom && !bugHunt && (
+        <div className="lobby-bughunt-buttons">
+          <button type="button" onClick={startBugHunt}>
+            Play Bug Hunt (60s)
+          </button>
+          <button type="button" onClick={startSpotStream}>
+            Play Spot the Real Stream
+          </button>
+        </div>
       )}
 
       <MomentsReel />
+      <PoseReel />
       <div className="lobby-players">
         <h3>Players ({players.length})</h3>
         <ul>

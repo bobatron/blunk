@@ -91,8 +91,12 @@ export interface GameState {
   bugHuntResults: { playerId: string; eaten: number }[] | null;
   /** Face snapshots from the current round. */
   snapshots: { id: number; playerId: string; image: string }[];
-  /** Snapshots from the round that just ended, played as a looping slideshow until the next round. */
+  /** Snapshots from the round/Bug Hunt that just ended, played as a looping slideshow until the next round. */
   reel: { key: number; items: { id: number; playerId: string; image: string }[] } | null;
+  /** One captured pose per turn, across the whole Spot the Real Stream series. */
+  spotStreamPoses: { playerId: string; frame: string }[];
+  /** The poses from the series that just ended, played as a looping slideshow. */
+  spotStreamReel: { key: number; items: { id: number; playerId: string; image: string }[] } | null;
   /** The mode vote currently running, "random games" lobbies only. */
   vote: VoteUiState | null;
   /** The mode that just won a vote — a brief announcement, cleared once that mode actually starts. */
@@ -139,6 +143,8 @@ export const initialGameState: GameState = {
   bugHuntResults: null,
   snapshots: [],
   reel: null,
+  spotStreamPoses: [],
+  spotStreamReel: null,
   vote: null,
   votingResolvedMode: null,
   spotStream: null,

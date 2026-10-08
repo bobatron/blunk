@@ -86,7 +86,10 @@ export function LocalFaceSignals({ children }: { children: ReactNode }) {
       d.on("mouthOpen", () => {
         const g = gameRef.current;
         const alive = (g.players.find((p) => p.id === g.playerId)?.lives ?? 0) > 0;
-        if (!g.roundActive || !alive) return;
+        // Mouth-moment snapshots happen during a Staring Contest round, or
+        // during Bug Hunt (no "lives" there — just needs to be playing).
+        const inStaringRound = g.roundActive && alive;
+        if (!inStaringRound && !g.bugHunt) return;
         const video = videoRef.current;
         const image = video ? captureFace(video) : null;
         if (image) g.sendSnapshot(image);

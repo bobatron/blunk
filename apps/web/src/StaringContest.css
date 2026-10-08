@@ -65,14 +65,26 @@
 /* A quick red gut-punch, just for the player who lost the life — a flash
  * on their own screen, same full-viewport trick as the BLUNK flash, but
  * shorter and without the shake (this isn't an elimination). */
-.staring-contest-hud.self-hurt::after {
-  content: "";
+.self-hurt-flash {
   position: fixed;
   inset: 0;
   z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   pointer-events: none;
   background: rgba(215, 58, 74, 0.3);
   animation: self-hurt-fade 0.5s ease-out forwards;
+}
+
+.self-hurt-stamp {
+  font-family: var(--shout);
+  font-weight: 400;
+  font-size: 72px;
+  letter-spacing: 0.03em;
+  color: #d73a4a;
+  -webkit-text-stroke: 2px white;
+  transform: rotate(-6deg);
 }
 
 @keyframes self-hurt-fade {

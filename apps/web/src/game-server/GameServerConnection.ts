@@ -87,6 +87,7 @@ export interface GameServerEvents {
     liveBoxIndex: number;
     judgeVotes: SpotStreamJudgeVote[];
     awards: SpotStreamAward[];
+    frame: string;
   }) => void;
   "spot-stream-voided": (payload: Record<string, never>) => void;
   /** The whole series is done — everyone's had a turn as the model. */

@@ -88,6 +88,16 @@ export function playRoundStart() {
   tone(600, { startFrequency: 200, duration: 0.3, type: "square", gain: 0.2 });
 }
 
+/** A countdown tick — "2... 1..." before a round goes live. */
+export function playCountdownBeep() {
+  tone(440, { duration: 0.15, type: "sine", gain: 0.25 });
+}
+
+/** The countdown's final, higher beep — the round is live now. */
+export function playCountdownGo() {
+  tone(880, { duration: 0.25, type: "sine", gain: 0.3 });
+}
+
 /** The round-winner celebration — a quick rising arpeggio. */
 export function playWinnerFanfare() {
   const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6

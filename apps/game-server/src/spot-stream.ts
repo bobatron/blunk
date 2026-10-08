@@ -191,6 +191,9 @@ export function resolveSpotStream(room: Room): void {
       correct: box === stream.liveBoxIndex,
     })),
     awards: [...awards].map(([playerId, points]) => ({ playerId, points })),
+    // So clients can build a rotating reel of every model pose this series,
+    // once it ends.
+    frame: stream.frame,
   });
   broadcastLobby(room);
   // The model's box stays live during the reveal — they're free to move and
