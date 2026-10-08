@@ -31,7 +31,15 @@ export function StaringContest() {
   }, [roundActive]);
 
   useEffect(() => {
-    if (eliminations.length === 0) return;
+    if (eliminations.length === 0) {
+      // eliminations resets to [] between rounds/modes (so a stale BLUNKED
+      // badge doesn't ride into the next one) — if that reset lands while a
+      // flash is showing, this effect reruns, its cleanup below cancels the
+      // pending setFlash(null), and without this clear the flash would be
+      // stuck on-screen for good.
+      setFlash(null);
+      return;
+    }
     const last = eliminations[eliminations.length - 1];
     const name = players.find((p) => p.id === last.playerId)?.name ?? "Someone";
     setFlash({ name, key: Date.now() });
