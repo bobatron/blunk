@@ -138,8 +138,16 @@ export function SpotStream() {
           {stream.phase === "reveal" && isModel && (
             <p className="spot-stream-hint">That's you, highlighted below — wave to prove it!</p>
           )}
+          {/* "disguised" applies the same grayscale/blur filter to every box
+              (live and stills alike) only during voting — a live WebRTC feed
+              and a static JPEG still differ subtly no matter how good the
+              still's resolution gets (real per-frame noise and micro-
+              movement vs. a perfectly frozen, differently-compressed
+              image), and a shared filter masks that gap rather than chasing
+              it. Lifted for the reveal, so the model's real photo there
+              looks like an actual photo. */}
           <div
-            className="spot-stream-grid"
+            className={`spot-stream-grid${stream.phase === "voting" ? " disguised" : ""}`}
             style={{ gridTemplateColumns: `repeat(${gridCols(stream.boxCount)}, 1fr)` }}
           >
             {Array.from({ length: stream.boxCount }, (_, i) => (

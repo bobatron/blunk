@@ -42,5 +42,5 @@ export function captureFace(
     ctx.scale(-1, 1);
   }
   ctx.drawImage(video, sx, sy, sw, sh, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", highRes ? 0.9 : 0.7);
+  return canvas.toDataURL("image/jpeg", highRes ? 1 : 0.7);
 }

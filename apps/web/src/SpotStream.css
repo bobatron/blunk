@@ -123,6 +123,15 @@
   cursor: default;
 }
 
+/* Same filter on every box, live feed and stills alike — a shared "security
+   cam" look that masks the subtle differences between a real video frame
+   and a static JPEG (per-frame noise, micro-movement, compression) rather
+   than chasing them individually. */
+.spot-stream-grid.disguised .spot-stream-box img,
+.spot-stream-grid.disguised .spot-stream-box .spot-stream-video {
+  filter: grayscale(1) contrast(1.2) brightness(0.95) blur(0.6px);
+}
+
 .spot-stream-box img {
   height: 100%;
   width: 100%;
